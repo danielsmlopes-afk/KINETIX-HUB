@@ -1,10 +1,11 @@
-Markdown
 # KINETIX HUB - Architecture & Rules
 
 ## 🎯 Objetivo
+
 Plataforma autônoma de alta performance esportiva com foco em periodização, compliance de volume, telemetria corporal, gestão preditiva de provas e controle logístico de suplementação.
 
 ## 🛠 Stack Tecnológica & Integrações
+
 - **Backend:** Node.js + TypeScript + Hono.
 - **Database/ORM:** PostgreSQL (Neon DB Serverless) + Drizzle ORM.
 - **Frontend (Mobile UI):** Flutter (Dart) - 5 Abas: Dashboard, Planilha, Laboratório, Arsenal e Dossiês.
@@ -14,6 +15,7 @@ Plataforma autônoma de alta performance esportiva com foco em periodização, c
 - **Diretriz Zero Google:** Proibido o uso de APIs complexas do ecossistema Google para funções que podem ser resolvidas com alternativas nativas ou enxutas.
 
 ## 📂 Estrutura de Pastas (Backend)
+
 O repositório `/kinetix-api` obedece rigorosamente à seguinte árvore de arquivos modulares:
 
 ```text
@@ -29,12 +31,17 @@ kinetix-api/
     ├── config/
     │   └── env.ts              # Validação Zod estrita do .env
     ├── controllers/
+    │   ├── athleteController.ts  # Retorna dados do atleta
     │   └── telegramController.ts # Recepção de webhooks e comandos
     ├── db/
+    │   ├── index.ts            # Conexão Drizzle + Neon
     │   ├── schema.ts           # Tabelas (athletes, races, consumables, etc)
     │   └── seed.ts             # Carga inicial (Exercícios, Tênis, Prova P2)
-    ├── routes/                 # Definição de endpoints HTTP
-    ├── repositories/           # Abstração de queries diretas no banco
+    ├── routes/
+    │   └── api.ts              # Definição de endpoints HTTP
+    ├── repositories/
+    │   ├── athleteRepository.ts  # Buscas do atleta
+    │   └── telemetryRepository.ts# Inserção em bioimpedance_logs
     └── services/
         ├── briefingService.ts      # Montagem do briefing diário/sábado e checklist
         ├── cronJobs.ts             # Disparo autônomo do Telegram às 22h

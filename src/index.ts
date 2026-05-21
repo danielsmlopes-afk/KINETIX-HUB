@@ -1,23 +1,32 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { env } from '@/config/env';
-import { telegramController } from '@/controllers/telegramController';
-import { initCronJobs } from '@/services/cronJobs';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import { apiRoutes } from './routes/api'; // Puxa as suas rotas geradas
 
 const app = new Hono();
 
-app.get('/', (c) => {
-  return c.json({ data: { status: "KINETIX HUB API OPERACIONAL 🚀" } });
+// Middlewares essenciais
+app.use('*', logger());
+app.use('*', cors());
+
+// Rota de Health Check (Teste de vida)
+app.get('/health', (c) => {
+  return c.json({ 
+    status: "KINETIX HUB ONLINE", 
+    timestamp: new Date().toISOString() 
+  });
 });
 
-app.post('/webhook/telegram', telegramController.handleWebhook);
+// Montagem das rotas da API
+app.route('/api', apiRoutes);
 
-// Inicializa os disparos automáticos via node-cron (Briefings Logísticos)
-initCronJobs();
+// Configuração da porta
+const port = Number(process.env.PORT) || 3000;
+console.log(`🚀 Servidor KINETIX HUB rodando na porta ${port}`);
+console.log(`👉 Teste de vida: http://localhost:${port}/health`);
 
-const port = Number(env.PORT);
-
-console.log(`🚀 KINETIX HUB rodando na porta ${port}...`);
+// Inicia o servidor
 serve({
   fetch: app.fetch,
   port
