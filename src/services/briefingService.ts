@@ -1,7 +1,8 @@
-export function generateDailyBriefing(workoutDetails: string, weatherForecast: string): string {
+export function generateDailyBriefing(workoutDetails: string, weatherForecast: string, activityEmoji: string = '🎯', isRestDay: boolean = false): string {
+  const footerMessage = isRestDay ? "Boa recuperação!" : "Bom treino e foco no processo!";
   return `🤖 *BRIEFING DIÁRIO KINETIX*\n\n` +
-         `🏃‍♂️ *Sessão:* ${workoutDetails}\n` +
-         `🌤 *Clima esperado:* ${weatherForecast}\n\nBom treino, mantenha o pace!`;
+         `${activityEmoji} *Sessão:* ${workoutDetails}\n\n` +
+         `🌤 *Clima esperado:* ${weatherForecast}\n\n${footerMessage}`;
 }
 
 export function generatePreRaceChecklist(raceTime: string, temp: number, gels: number): string {

@@ -11,5 +11,7 @@ export async function calculateAndDeductGels(durationMinutes: number, gelItemId:
   }
   gelsNeeded += 1; // 1 Extra de segurança
   
+  await deductInventory(gelItemId, gelsNeeded);
+
   return gelsNeeded;
 }

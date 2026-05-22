@@ -8,7 +8,13 @@
     "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate:pg",
-    "db:push": "drizzle-kit push:pg"
+    "db:push": "drizzle-kit push:pg",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:reset": "tsx src/db/reset.ts",
+    "db:migrate-tokens": "tsx src/db/migrateTokens.ts",
+    "db:setup": "npm run db:reset && npm run db:push && npm run db:seed && npm run db:migrate-tokens",
+    "db:import-races": "tsx src/services/importPastRaces.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.10.1",
@@ -19,6 +25,7 @@
     "hono": "^4.2.7",
     "node-cron": "^3.0.3",
     "pdfkit": "^0.15.0",
+    "pg": "^8.21.0",
     "zod": "^3.23.6"
   },
   "devDependencies": {
