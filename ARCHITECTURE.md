@@ -99,8 +99,10 @@ Checklist Pré-Prova (Véspera): Horário de largada, vestimenta, nutrição cal
 
 **Recálculo de Rota (Adaptação Dinâmica):** Caso o sistema detecte que um treino planejado foi "pulado" (ausência de dados no Strava) ou cancelado manualmente, a IA avalia o impacto no volume semanal e sugere adaptações (compensação ou descanso) para as próximas sessões.
 
+**Geração Autônoma de Macrociclo:** O Head Coach IA pode estruturar do zero ou adaptar ciclos de treino baseados em provas alvo (P1/P2), salvando-os de forma estruturada diretamente no banco de dados.
+
 **7. Relatórios Táticos (PDF)**
-Exportação autônoma: Dossiê de Macrociclo, Prontuário de Prova, Raio-X Fisiológico e Auditoria de Equipamentos.
+Exportação autônoma: Dossiê de Macrociclo, Prontuário de Prova, Raio-X Fisiológico, Auditoria de Equipamentos e Planilha de Treinamentos (Gerada dinamicamente).
 Uso estrito do PDFKit desenhando gráficos nativamente (sem dependências de Canvas extras).
 
 **8. Planilha de Treinamentos (Importação JSON)**
@@ -129,5 +131,6 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 5.1: Agendamento de Provas** - Rota e serviço de inclusão manual de provas futuras para alimentar o motor de periodização (P1/P2/P3).
 - [x] **Fase 5.2: Planilha de Treinos (JSON)** - Schema DB e endpoint de ingestão de macrociclos (Corrida, Musc, Bike) para o calendário.
 - [ ] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
-- [ ] **Fase 7: Head Coach IA** - Conectar Gemini/Groq para insights preditivos nos relatórios e recálculo de rota caso o atleta pule/cancele treinos agendados.
+- [x] **Fase 7: Head Coach IA** - Conectar Gemini/Groq para recálculo de rota, geração autônoma de Macrociclos (estruturado em JSON) e exportação da Planilha em PDF.
+- [ ] **Fase 7.1: Testes do Ciclo** - Realizar testes de ponta a ponta na geração e adaptação do ciclo de treinos estruturado pela IA.
 - [ ] **Fase 8: Segurança e App Mobile** - Firebase Auth e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).

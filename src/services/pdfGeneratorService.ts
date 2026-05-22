@@ -3,7 +3,7 @@ import PDFDocument from 'pdfkit';
 import { eq, and, between, inArray } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { env } from '@/config/env';
-import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races } from '@/db/schema';
+import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
 
 function decodePolyline(str: string, p = 5): [number, number][] {
   let idx = 0, lat = 0, lng = 0, coords: [number, number][] = [], factor = Math.pow(10, p);
@@ -207,6 +207,50 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
         doc.stroke();
       }
     }
+    doc.end();
+  });
+}
+
+export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
+  const workouts = await db.select().from(plannedWorkouts)
+    .where(eq(plannedWorkouts.athleteId, athleteId))
+    .orderBy(plannedWorkouts.date);
+
+  return new Promise((resolve, reject) => {
+    const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
+    const doc = new Doc({ margin: 50 });
+    const buffers: Buffer[] = [];
+
+    doc.on('data', (chunk: Buffer) => buffers.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).fillColor('black').text('KINETIX HUB - Planilha de Treinamento', { align: 'center' }).moveDown(2);
+
+    if (workouts.length === 0) {
+      doc.fontSize(12).text('Nenhum treino planejado encontrado no banco de dados.');
+    } else {
+      workouts.forEach((w, idx) => {
+        const dateStr = w.date.toLocaleDateString('pt-BR');
+        let emoji = '💤';
+        if (w.activityType === 'RUN') emoji = '🏃‍♂️';
+        else if (w.activityType === 'BIKE') emoji = '🚴‍♂️';
+        else if (w.activityType === 'STRENGTH') emoji = '🏋️‍♂️';
+
+        doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${dateStr} - ${emoji} ${w.activityType}: ${w.title}`);
+        
+        let detailsStr = '';
+        if (w.details && typeof w.details === 'object') {
+          detailsStr = Object.entries(w.details).map(([k, v]) => `${k}: ${v}`).join(' | ');
+        }
+        
+        if (detailsStr) {
+          doc.fontSize(10).fillColor('#4b5563').text(`    Detalhes: ${detailsStr}`);
+        }
+        doc.moveDown(0.5);
+      });
+    }
+
     doc.end();
   });
 }

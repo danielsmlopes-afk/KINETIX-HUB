@@ -115,3 +115,13 @@ export const cronLogs = pgTable('cron_logs', {
   status: text('status').notNull(),
   message: text('message'),
 });
+
+export const pendingActions = pgTable('pending_actions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  athleteId: uuid('athlete_id').references(() => athletes.id).notNull(),
+  workoutId: uuid('workout_id').notNull(),
+  action: text('action').notNull(), // 'RESCHEDULE' | 'CANCEL'
+  newDate: timestamp('new_date'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

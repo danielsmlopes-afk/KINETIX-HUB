@@ -1,6 +1,6 @@
 // Arquivo: src/controllers/reportController.ts
 import { Context } from 'hono';
-import { generatePhysiologicalXRayPDF, generateRaceReportPDF, generateCareerReportPDF } from '@/services/pdfGeneratorService';
+import { generatePhysiologicalXRayPDF, generateRaceReportPDF, generateCareerReportPDF, generatePlanPDF } from '@/services/pdfGeneratorService';
 import { athleteRepository } from '@/repositories/athleteRepository';
 
 export const reportController = {
@@ -66,6 +66,24 @@ export const reportController = {
     } catch (error) {
       console.error('❌ [REPORT CONTROLLER] Erro fatal na geração do Dossiê de Carreira:', error);
       return c.json({ error: "Erro interno ao gerar o Dossiê de Carreira.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadPlanReport(c: Context) {
+    try {
+      let athleteId = c.req.query('athleteId');
+      if (!athleteId) {
+        const athlete = await athleteRepository.getPrimaryAthlete();
+        if (!athlete) return c.json({ error: "Atleta não encontrado.", code: "NOT_FOUND" }, 404);
+        athleteId = athlete.id;
+      }
+      const pdfBuffer = await generatePlanPDF(athleteId);
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', `attachment; filename="planilha_treinos.pdf"`);
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      console.error('❌ [REPORT CONTROLLER] Erro fatal na geração do PDF de planilha:', error);
+      return c.json({ error: "Erro interno ao gerar o PDF de Planilha.", code: "PDF_ERR" }, 500);
     }
   }
 };
