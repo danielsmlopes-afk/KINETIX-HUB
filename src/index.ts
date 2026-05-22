@@ -19,6 +19,15 @@ app.get('/health', (c) => {
   });
 });
 
+// Rota de Health Check exigida pelo Render
+app.get('/api/healthz', (c) => {
+  return c.json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  }, 200);
+});
+
 // Montagem das rotas da API
 app.route('/api', apiRoutes);
 
