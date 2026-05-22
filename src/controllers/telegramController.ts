@@ -167,6 +167,11 @@ export const telegramController = {
         return c.text('EVENT_RECEIVED', 200);
       }
 
+      // Se for um evento do Telegram (como edições de mensagem ou atualizações de status) que não possui texto, ignoramos silenciosamente para evitar loops de retentativa
+      if ('update_id' in body) {
+        return c.text('EVENT_RECEIVED', 200);
+      }
+
       const parsed = bioimpedanceSchema.safeParse(body);
 
       if (!parsed.success) {
