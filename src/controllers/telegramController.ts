@@ -6,7 +6,7 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { runDailyBriefingJob, runRouteRecalculationJob } from '@/services/cronJobs';
 import { eq, and, inArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { pendingActions, plannedWorkouts } from '@/db/schema';
+import { pendingActions, plannedWorkouts, bioimpedanceLogs } from '@/db/schema';
 import { env } from '@/config/env';
 import { workoutBatchSchema } from '@/validators/workoutSchema';
 
@@ -72,6 +72,13 @@ export const telegramController = {
             if (bioParsed.success) {
               const athlete = await athleteRepository.getPrimaryAthlete();
               if (athlete) {
+                // Remove bioimpedância existente da mesma data/hora para evitar duplicidade
+                await db.delete(bioimpedanceLogs).where(
+                  and(
+                    eq(bioimpedanceLogs.athleteId, athlete.id),
+                    eq(bioimpedanceLogs.date, new Date(bioParsed.data.date))
+                  )
+                );
                 await telemetryRepository.insertLog(athlete.id, bioParsed.data);
                 await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
                   method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -119,7 +126,12 @@ export const telegramController = {
             if (workoutParsed.success && workoutParsed.data.length > 0) {
               const athlete = await athleteRepository.getPrimaryAthlete();
               if (athlete) {
-                const workouts = workoutParsed.data;
+                // Remove duplicatas dentro do próprio payload enviado (Mesmo dia e mesmo tipo)
+                const uniqueWorkoutsMap = new Map<string, typeof workoutParsed.data[0]>();
+                for (const w of workoutParsed.data) {
+                  uniqueWorkoutsMap.set(`${w.date}-${w.type}`, w);
+                }
+                const workouts = Array.from(uniqueWorkoutsMap.values());
                 const uniqueDateStrings = Array.from(new Set(workouts.map(w => new Date(w.date).toISOString()))) as string[];
                 const datesToClear = uniqueDateStrings.map(d => new Date(d));
 
@@ -184,6 +196,14 @@ export const telegramController = {
       if (!athlete) {
         return c.json({ error: "Atleta principal não encontrado no banco.", code: "ATHLETE_NOT_FOUND" }, 404);
       }
+
+      // Previne duplicidade para webhooks diretos
+      await db.delete(bioimpedanceLogs).where(
+        and(
+          eq(bioimpedanceLogs.athleteId, athlete.id),
+          eq(bioimpedanceLogs.date, new Date(data.date))
+        )
+      );
 
       const insertedLog = await telemetryRepository.insertLog(athlete.id, data);
 

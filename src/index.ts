@@ -11,6 +11,11 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
+// Rota raiz para evitar erro 404 (Render/Pings)
+app.get('/', (c) => {
+  return c.text('KINETIX HUB API IS RUNNING', 200);
+});
+
 // Rota de Health Check (Teste de vida)
 app.get('/health', (c) => {
   return c.json({ 

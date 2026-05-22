@@ -127,7 +127,7 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 2: Core de Dados & Telemetria** - Definição do schema DB, Seed inicial, e Webhook do Telegram recebendo o JSON completo da Bioimpedância.
 - [x] **Fase 3: Motor de Relatórios** - Endpoint e Serviço PDFKit para gerar o "Raio-X Fisiológico Mensal" com gráficos nativos, cruzando dados reais do banco.
 - [x] **Fase 4: Single-Tenant Architect** - Refatoração para que o sistema identifique automaticamente o Atleta Principal sem depender de UUIDs na URL.
-- [x] **Fase 5: Integração Strava (SSOT)** - Autenticação OAuth2, webhook de atividades em tempo real, atualização de quilometragem de Tênis (`gear_id`) e importação do histórico de carreira com mapas vetoriais nativos, tempo, pace e clima retroativo (Open-Meteo).
+- [x] **Fase 5: Integração Strava (SSOT)** - Autenticação OAuth2, webhook de atividades em tempo real (Webhook ID ativo: `348336`), atualização de quilometragem de Tênis (`gear_id`) e importação do histórico de carreira com mapas vetoriais nativos, tempo, pace e clima retroativo (Open-Meteo).
 - [x] **Fase 5.1: Agendamento de Provas** - Rota e serviço de inclusão manual de provas futuras para alimentar o motor de periodização (P1/P2/P3).
 - [x] **Fase 5.2: Planilha de Treinos (JSON)** - Schema DB e endpoint de ingestão de macrociclos (Corrida, Musc, Bike) para o calendário.
 - [ ] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
