@@ -68,7 +68,7 @@ Drizzle-first: Toda migração de banco via Drizzle CLI.
 1. Gestão de Provas e Macrociclos (16 Semanas)
 O sistema gera ciclos de 16 semanas (3 carga + 1 descarga).
 
-Cadastro de Provas: Suporta importação histórica via Strava e Inclusão Manual de provas futuras. O agendamento manual exige: Nome, Categoria (P1/P2/P3), Data, Distância, Horário da Largada, Local da Largada e Meta de Ritmo (Pace Alvo).
+Cadastro de Provas: Suporta importação histórica via Strava e Inclusão Manual de provas futuras via JSON (Telegram) ou API. O agendamento manual exige: Nome, Categoria (P1/P2/P3), Data, Distância, Horário da Largada, Local da Largada e Meta de Ritmo (Pace Alvo). Se a meta for "auto", a IA aplica um "Smart Pace", calculando uma evolução segura de 4% a 6% com base no seu histórico real do Strava.
 
 2. Matriz de Frequência e Overlapping
 Sessões Independentes (UUIDs): Permite múltiplos treinos no mesmo dia.
@@ -83,7 +83,7 @@ Esteira: Ignora GPS/Clima. Aquecimento 6,5 km/h, Desaquecimento 4,5 km/h. Repous
 **4. Telemetria Corporal e Gráficos**
 Recepção via Telegram de Peso, % Gordura e TMB.
 
-DataViz (Frontend): Gráficos cruzando adaptação metabólica com Carga (PNL).
+Integração IA: A última bioimpedância (peso, % gordura, massa muscular) dita o foco metabólico ou de hipertrofia/prevenção na geração dos macrociclos pelo Head Coach.
 
 **5. Arsenal: Equipamentos e Suplementação**
 Gear Tracking: Rastreio do gear_id (Strava) para auditar a vida útil dos tênis.
@@ -94,6 +94,8 @@ Controle de Suprimentos: Monitoramento de estoque de géis de carboidrato e cáp
 Briefing Diário (22h00): Treino de amanhã + Clima.
 
 Estratégia Nutricional: 1º gel aos 60 min, demais a cada 30 min + 1 extra. A quantidade recomendada é deduzida do estoque automaticamente após a confirmação do treino.
+
+Comandos Telegram: Aceita `/ajuda` para gerar templates, aprovação de recálculo com `OK`, e ingestão direta de JSONs no chat para Provas, Bioimpedância e Planilhas.
 
 Checklist Pré-Prova (Véspera): Horário de largada, vestimenta, nutrição calculada.
 
@@ -131,6 +133,7 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 5.1: Agendamento de Provas** - Rota e serviço de inclusão manual de provas futuras para alimentar o motor de periodização (P1/P2/P3).
 - [x] **Fase 5.2: Planilha de Treinos (JSON)** - Schema DB e endpoint de ingestão de macrociclos (Corrida, Musc, Bike) para o calendário.
 - [x] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
-- [x] **Fase 7: Head Coach IA** - Conectar Gemini/Groq para recálculo de rota, geração autônoma de Macrociclos (estruturado em JSON) e exportação da Planilha em PDF.
-- [ ] **Fase 7.1: Testes do Ciclo** - Realizar testes de ponta a ponta na geração e adaptação do ciclo de treinos estruturado pela IA.
+- [x] **Fase 7: Head Coach IA** - Conectar Gemini para recálculo de rota interativo (Humano no Ciclo), geração autônoma de Macrociclos ("Smart Pace" de 4-6%) e multidisciplinaridade (lendo bioimpedância).
+- [x] **Fase 7.1: Testes do Ciclo** - Testes ponta a ponta concluídos: Recálculo de rota validado no Telegram e Macrociclo gerado com sucesso via API.
 - [ ] **Fase 8: Segurança e App Mobile** - Firebase Auth e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).
+- [ ] **DevOps / Infra (Para Amanhã):** Configurar a "Maintenance Window" nativa no painel do UptimeRobot (das 00:01 às 05:59) e remover as funções obsoletas de `toggleMonitor` no `cronJobs.ts` para poupar o Render Free Tier.
