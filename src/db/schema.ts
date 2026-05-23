@@ -74,6 +74,7 @@ export const workoutSessions = pgTable('workout_sessions', {
   load: doublePrecision('load'),
   distance: doublePrecision('distance'),
   gearId: text('gear_id'),
+  averageHeartRate: integer('average_heartrate'),
 });
 
 export const treadmillIntervals = pgTable('treadmill_intervals', {
@@ -125,4 +126,14 @@ export const pendingActions = pgTable('pending_actions', {
   newDate: timestamp('new_date'),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const strengthLogs = pgTable('strength_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').notNull().references(() => workoutSessions.id, { onDelete: 'cascade' }),
+  exerciseId: uuid('exercise_id').notNull().references(() => exerciseLibrary.id, { onDelete: 'restrict' }),
+  actualSets: integer('actual_sets').notNull(),
+  actualReps: text('actual_reps').notNull(),
+  weightUsed: doublePrecision('weight_used'),
+  notes: text('notes'),
 });

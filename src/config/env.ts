@@ -10,6 +10,7 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string(),
   TELEGRAM_CHAT_ID: z.string(),
   TELEGRAM_CRON_SECRET: z.string(),
+  CRON_SECRET: z.string(),
   STRAVA_CLIENT_ID: z.string().optional(),
   STRAVA_CLIENT_SECRET: z.string().optional(),
   STRAVA_REDIRECT_URI: z.string().optional(),

@@ -1,7 +1,9 @@
+
 # KINETIX HUB - Motor de Relatórios Táticos e Vetoriais (PDF)
 
 ## 🎯 Visão Geral
-O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuais de alta performance (Dossiês e Logbooks) diretamente no backend. 
+
+O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuais de alta performance (Dossiês e Logbooks) diretamente no backend.
 **Regra de Ouro:** Uso estrito do `pdfkit` gerando gráficos, tabelas e eixos cartesianos nativamente via vetores (sem dependências de frontend como Chart.js ou Canvas).
 
 ## 📂 Estrutura de Arquivos

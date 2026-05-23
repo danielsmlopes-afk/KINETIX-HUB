@@ -29,7 +29,8 @@ export const workoutService = {
       durationMinutes,
       load: pnl,
       distance: activity.distance,
-      gearId: activity.gear_id
+      gearId: activity.gear_id,
+      averageHeartRate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null
     });
     console.log(`📊 Treino salvo! Duração: ${durationMinutes}min | Carga Normalizada (PNL calculada): ${pnl.toFixed(2)}`);
 

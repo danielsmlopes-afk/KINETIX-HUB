@@ -2,6 +2,11 @@
 import { Context } from 'hono';
 import { generatePhysiologicalXRayPDF, generateRaceReportPDF, generateCareerReportPDF, generatePlanPDF } from '@/services/pdfGeneratorService';
 import { athleteRepository } from '@/repositories/athleteRepository';
+import { generateLogbookPdf } from '../services/pdf/logbookService';
+import { generateCareerHistoryPdf } from '../services/pdf/careerHistoryService';
+import { generateRaceBriefingPdf } from '../services/pdf/raceBriefingService';
+import { generateCardioReportPdf } from '../services/pdf/cardioEfficiencyService';
+import { generateStrengthAuditPdf } from '../services/pdf/strengthAuditService';
 
 export const reportController = {
   async downloadXRay(c: Context) {
@@ -84,6 +89,76 @@ export const reportController = {
     } catch (error) {
       console.error('❌ [REPORT CONTROLLER] Erro fatal na geração do PDF de planilha:', error);
       return c.json({ error: "Erro interno ao gerar o PDF de Planilha.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadLogbook(c: Context) {
+    try {
+      const cycleId = c.req.param('cycleId');
+      if (!cycleId) {
+        return c.json({ error: "ID do ciclo não fornecido.", code: "MISSING_PARAMS" }, 400);
+      }
+
+      const pdfBuffer = await generateLogbookPdf(cycleId);
+      
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', 'attachment; filename="diario_viagem.pdf"');
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      console.error('❌ [REPORT CONTROLLER] Erro fatal na geração do Logbook PDF:', error);
+      return c.json({ error: "Erro interno ao gerar o Diário de Viagem.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadCareerHistory(c: Context) {
+    try {
+      const pdfBuffer = await generateCareerHistoryPdf('primary-athlete');
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', 'attachment; filename="historico_carreira.pdf"');
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      return c.json({ error: "Erro ao gerar Histórico.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadRaceBriefing(c: Context) {
+    try {
+      const raceId = c.req.param('raceId') || 'SP-21K';
+      const pdfBuffer = await generateRaceBriefingPdf(raceId);
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', `attachment; filename="race_briefing_${raceId}.pdf"`);
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      return c.json({ error: "Erro ao gerar Briefing.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadCardioReport(c: Context) {
+    try {
+      const month = c.req.param('month') || 'Geral';
+      const pdfBuffer = await generateCardioReportPdf(month);
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', `attachment; filename="cardio_report_${month}.pdf"`);
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      return c.json({ error: "Erro ao gerar Relatório Cardio.", code: "PDF_ERR" }, 500);
+    }
+  },
+
+  async downloadStrengthAudit(c: Context) {
+    try {
+      const sessionId = c.req.param('sessionId');
+      const templateId = c.req.query('templateId');
+
+      if (!sessionId || !templateId) {
+        return c.json({ error: "Os parâmetros 'sessionId' e 'templateId' são obrigatórios.", code: "MISSING_PARAMS" }, 400);
+      }
+      const pdfBuffer = await generateStrengthAuditPdf(sessionId, templateId);
+      c.header('Content-Type', 'application/pdf');
+      c.header('Content-Disposition', `attachment; filename="auditoria_forca_${sessionId.slice(0,6)}.pdf"`);
+      return c.body(new Uint8Array(pdfBuffer));
+    } catch (error) {
+      return c.json({ error: "Erro ao gerar Auditoria de Força em PDF.", code: "PDF_ERR" }, 500);
     }
   }
 };

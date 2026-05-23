@@ -33,7 +33,8 @@ kinetix-api/
     ├── controllers/
     │   ├── athleteController.ts  # Retorna dados do atleta principal (Single-Tenant)
     │   ├── reportController.ts   # Orquestração do download de PDFs
-    │   └── telegramController.ts # Recepção de webhooks e comandos do Telegram
+    │   ├── telegramController.ts # Recepção de webhooks e comandos do Telegram
+    │   └── webhookController.ts  # Orquestra disparos autônomos seguros (x-cron-secret)
     ├── db/
     │   ├── index.ts            # Conexão Drizzle + Neon
     │   ├── schema.ts           # Tabelas (athletes, races, consumables, etc)
@@ -41,7 +42,8 @@ kinetix-api/
     ├── routes/
     │   └── api.ts              # Definição de endpoints HTTP
     │   ├── reportRoutes.ts     # Rotas isoladas para geração de Dossiês
-    │   └── telegramRoutes.ts   # Rotas do webhook do Telegram
+    │   ├── telegramRoutes.ts   # Rotas do webhook do Telegram
+    │   └── webhookRoutes.ts    # Rotas protegidas para integrações externas (cron-job.org)
     ├── repositories/
     │   ├── athleteRepository.ts  # Buscas do atleta principal
     │   └── telemetryRepository.ts# Inserção em bioimpedance_logs
@@ -49,6 +51,16 @@ kinetix-api/
     │   └── workoutSchema.ts      # Schemas Zod para tipagem estrita e validação de payloads (JSON)
     └── services/
         ├── briefingService.ts      # Montagem do briefing diário/sábado e checklist
+        ├── acwrService.ts          # Serviço para cálculo de Fadiga Semanal e ACWR
+        ├── dbMaintenanceService.ts # Serviço para limpeza de logs e renovação de tokens
+        ├── weatherPacingService.ts # Inteligência preditiva de clima para provas futuras
+        ├── pdf/                    # Motor Vetorial de Relatórios (PDFKit)
+        │   ├── logbookService.ts          # Diário de Viagem (Gráfico de Topografia ACWR)
+        │   ├── careerHistoryService.ts    # Histórico Strava (Gráfico de Barras)
+        │   ├── raceBriefingService.ts     # Prontuário Pré-Prova (Smart Pace)
+        │   ├── cardioEfficiencyService.ts # Raio-X Cardiovascular (Gráfico de Dispersão c/ Drizzle)
+        │   └── strengthAuditService.ts    # Auditoria de Força (Planejado vs Realizado)
+        ├── coachService.ts         # Serviço IA (Groq/Llama3) para auditoria pós-treino
         ├── cronJobs.ts             # Disparo autônomo do Telegram às 22h
         ├── inventoryService.ts     # Baixa de estoque e alertas de reposição
         ├── loadCalculator.ts       # Fatoramento matemático do PNL
@@ -121,6 +133,11 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - **Flexibilidade:** A qualquer momento, uma ficha pode ser reconfigurada via JSON ou Interface, atualizando os exercícios, séries e repetições sem invalidar o histórico.
 - **Auditoria:** O sistema guarda o log do que foi realizado (carga/reps) comparado ao que estava na ficha daquele dia (planejado vs. realizado).
 
+**10. Automação de Performance (Webhooks Estratégicos)**
+- **Weather-Pacing:** Varredura climática das próximas provas para sugerir adaptações de ritmo.
+- **Auditoria ACWR:** Cálculo de Fadiga (Aguda vs Crônica) para alertar sobre "Zonas de Perigo".
+- **DB Maintenance:** Limpeza periódica do banco e renovação proativa de tokens do Strava.
+
 ---
 
 ## 🚀 Roadmap de Desenvolvimento
@@ -135,5 +152,9 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
 - [x] **Fase 7: Head Coach IA** - Conectar Gemini para recálculo de rota interativo (Humano no Ciclo), geração autônoma de Macrociclos ("Smart Pace" de 4-6%) e multidisciplinaridade (lendo bioimpedância).
 - [x] **Fase 7.1: Testes do Ciclo** - Testes ponta a ponta concluídos: Recálculo de rota validado no Telegram e Macrociclo gerado com sucesso via API.
-- [ ] **Fase 8: Segurança e App Mobile** - Firebase Auth e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).
-- [ ] **DevOps / Infra (Para Amanhã):** Configurar a "Maintenance Window" nativa no painel do UptimeRobot (das 00:01 às 05:59) e remover as funções obsoletas de `toggleMonitor` no `cronJobs.ts` para poupar o Render Free Tier.
+- [x] **Fase 7.2: Webhooks Estratégicos** - Controladores e rotas criados para Weather-Pacing, ACWR e Manutenção DB via cron-job.org.
+- [x] **Fase 7.3: Serviços de Automação** - Stubs substituídos por serviços reais com integrações do Drizzle e APIs externas.
+- [x] **Fase 7.4: Auditoria IA Pós-Treino (Strava)** - Análise de Corridas via Groq/Llama3 comparando Pace/Distância Planejado vs Realizado e envio de feedback no Telegram.
+- [x] **Fase 9: Gestão Dinâmica de Força (IronLog_V2)** - Tabela `strength_logs` e reestruturação da biblioteca de Fichas (A, B, C) via Seed. Endpoints para log de força, API de auditoria (`/audit`), geração vetorial do Dossiê Tático em PDF e comando nativo `/auditoria` no Telegram Bot.
+- [ ] **Fase 8: Segurança e App Mobile** - Implementar arquitetura base para Firebase Auth no backend (validação JWT) e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).
+- [ ] **DevOps / Infra:** Configurar a "Maintenance Window" nativa no painel do UptimeRobot (das 00:01 às 05:59) e remover as funções obsoletas de `toggleMonitor` no `cronJobs.ts` para poupar o Render Free Tier.

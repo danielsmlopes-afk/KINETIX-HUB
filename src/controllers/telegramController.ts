@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { telemetryRepository } from '@/repositories/telemetryRepository';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { runDailyBriefingJob, runRouteRecalculationJob } from '@/services/cronJobs';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { db } from '@/db';
-import { pendingActions, plannedWorkouts, bioimpedanceLogs, races } from '@/db/schema';
+import { pendingActions, plannedWorkouts, bioimpedanceLogs, races, workoutSessions, strengthLogs, workoutTemplateItems } from '@/db/schema';
 import { env } from '@/config/env';
 import { workoutBatchSchema } from '@/validators/workoutSchema';
 
@@ -71,7 +71,10 @@ Aqui estão os modelos para enviar dados via Telegram. Basta copiar o bloco de c
 }
 \`\`\`
 
-*3. Aprovar Sugestão da IA:*
+*3. Gerar Auditoria de Força:*
+Digite \`/auditoria\` para receber o link em PDF do seu último treino de força.
+
+*4. Aprovar Sugestão da IA:*
 Para aprovar um recálculo de rota sugerido pelo Head Coach, simplesmente responda à mensagem com:
 \`OK\``;
           await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -104,6 +107,54 @@ Para aprovar um recálculo de rota sugerido pelo Head Coach, simplesmente respon
             });
           }
           return c.text('OK_PROCESSED', 200);
+        }
+
+        if (text.toUpperCase() === '/AUDITORIA') {
+          const athlete = await athleteRepository.getPrimaryAthlete();
+          if (!athlete) return c.json({ error: "Atleta principal não encontrado." }, 404);
+
+          const lastLog = await db.select({
+            sessionId: strengthLogs.sessionId,
+            exerciseId: strengthLogs.exerciseId
+          })
+          .from(strengthLogs)
+          .innerJoin(workoutSessions, eq(strengthLogs.sessionId, workoutSessions.id))
+          .where(eq(workoutSessions.athleteId, athlete.id))
+          .orderBy(desc(workoutSessions.date))
+          .limit(1);
+
+          if (lastLog.length === 0) {
+            await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: "❌ *Nenhum treino de força encontrado na base.*", parse_mode: 'Markdown' })
+            });
+            return c.text('NO_LOGS', 200);
+          }
+
+          const { sessionId, exerciseId } = lastLog[0];
+          const templateAssoc = await db.select({ templateId: workoutTemplateItems.templateId })
+            .from(workoutTemplateItems)
+            .where(eq(workoutTemplateItems.exerciseId, exerciseId))
+            .limit(1);
+
+          if (templateAssoc.length === 0) {
+            await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: "⚠️ *Aviso:* Não foi possível associar seu último treino a uma Ficha original.", parse_mode: 'Markdown' })
+            });
+            return c.text('NO_TEMPLATE', 200);
+          }
+
+          const templateId = templateAssoc[0].templateId;
+          const baseUrl = process.env.RENDER_EXTERNAL_URL || 'https://kinetix-api-7jld.onrender.com';
+          const pdfLink = `${baseUrl}/api/reports/strength-audit/${sessionId}?templateId=${templateId}`;
+          
+          const message = `📄 *Auditoria de Força*\n\nComandante, o seu Dossiê Tático comparando o Planejado vs Realizado do seu último treino está pronto:\n\n🔗 Download do Relatório PDF`;
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' })
+          });
+          return c.text('AUDITORIA_SENT', 200);
         }
 
         // Extrai o bloco JSON ignorando textos antes ou depois (ex: "Aqui está o treino:\n```json ... ```")

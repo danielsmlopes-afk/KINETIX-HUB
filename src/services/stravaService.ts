@@ -8,8 +8,11 @@ export interface StravaActivity {
   moving_time: number;
   type: string;
   start_date: string;
+  start_date_local?: string;
   gear_id: string | null;
   total_elevation_gain: number;
+  average_speed?: number;
+  average_heartrate?: number;
   workout_type?: number; // 1 = Race (Prova), 2 = Long Run, 3 = Workout
   start_latlng?: [number, number];
   map?: {
