@@ -16,6 +16,11 @@ app.get('/', (c) => {
   return c.text('KINETIX HUB API IS RUNNING', 200);
 });
 
+// Silencia requisições de favicon do navegador
+app.get('/favicon.ico', (c) => {
+  return c.body(null, 204);
+});
+
 // Rota de Health Check (Teste de vida)
 app.get('/health', (c) => {
   return c.json({ 

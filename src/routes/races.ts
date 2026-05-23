@@ -2,8 +2,20 @@ import { Hono } from 'hono';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { races } from '@/db/schema';
+import { z } from 'zod';
 
 const racesRouter = new Hono();
+
+const raceSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório"),
+  category: z.enum(['P1', 'P2', 'P3']),
+  date: z.string().datetime(), // ISO Date
+  distance: z.number().positive("A distância deve ser um número positivo"),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Formato de hora HH:MM"),
+  startLocation: z.string().min(1, "Localização é obrigatória"),
+  isTarget: z.boolean().optional().default(false),
+  targetPace: z.string().min(4, "Ex: 6:30 ou 6:30 a 7:00")
+});
 
 racesRouter.get('/', async (c) => {
   try {
@@ -20,12 +32,13 @@ racesRouter.get('/', async (c) => {
 racesRouter.post('/', async (c) => {
   try {
     const body = await c.req.json();
-    const { name, category, date, distance, startTime, startLocation, isTarget } = body;
+    const parsed = raceSchema.safeParse(body);
 
-    // Validação estrita conforme as regras de negócio
-    if (!name || !category || !date || !distance || !startTime || !startLocation) {
-      return c.json({ success: false, error: "Dados incompletos. Requer: name, category, date, distance, startTime, startLocation.", code: "MISSING_FIELDS" }, 400);
+    if (!parsed.success) {
+      return c.json({ success: false, error: "Falha na validação de dados.", code: "VALIDATION_ERROR", details: parsed.error.format() }, 400);
     }
+
+    const { name, category, date, distance, startTime, startLocation, isTarget, targetPace } = parsed.data;
 
     const inserted = await db.insert(races).values({
       name,
@@ -34,7 +47,8 @@ racesRouter.post('/', async (c) => {
       distance,
       startTime,
       startLocation,
-      isTarget: isTarget || false,
+      isTarget,
+      targetPace,
     }).returning();
 
     return c.json({ success: true, data: inserted[0] }, 201);
@@ -49,7 +63,13 @@ racesRouter.put('/:id', async (c) => {
   const id = c.req.param('id');
   try {
     const body = await c.req.json();
-    const { name, category, date, distance, startTime, startLocation, isTarget } = body;
+    const parsed = raceSchema.partial().safeParse(body);
+
+    if (!parsed.success) {
+      return c.json({ success: false, error: "Falha na validação de dados.", code: "VALIDATION_ERROR", details: parsed.error.format() }, 400);
+    }
+
+    const { name, category, date, distance, startTime, startLocation, isTarget, targetPace } = parsed.data;
 
     // Atualiza apenas os campos que foram enviados na requisição
     const updated = await db.update(races)
@@ -60,7 +80,8 @@ racesRouter.put('/:id', async (c) => {
         ...(distance && { distance }),
         ...(startTime && { startTime }),
         ...(startLocation && { startLocation }),
-        ...(isTarget !== undefined && { isTarget })
+        ...(isTarget !== undefined && { isTarget }),
+        ...(targetPace && { targetPace })
       })
       .where(eq(races.id, id))
       .returning();

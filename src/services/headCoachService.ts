@@ -81,8 +81,10 @@ export interface MacrocycleGenerationRequest {
   targetRaceName: string;
   targetRaceDate: string;
   targetDistanceKm: number;
+  targetPaceInstruction: string;
   athleteName: string;
   existingWorkouts?: any[];
+  bioimpedance?: any;
 }
 
 export interface MacrocycleWorkout {
@@ -108,8 +110,14 @@ Você DEVE retornar EXATAMENTE um JSON array válido com os treinos. Formato:
   
   const fullPrompt = `[ATLETA]: ${request.athleteName}
 [PROVA ALVO]: ${request.targetRaceName} (${request.targetDistanceKm}km) em ${request.targetRaceDate}
+[META DE RITMO (PACE)]: ${request.targetPaceInstruction}
+[COMPOSIÇÃO CORPORAL]: ${request.bioimpedance ? JSON.stringify(request.bioimpedance) : 'Não informada'}
 [TREINOS EXISTENTES]: ${request.existingWorkouts ? JSON.stringify(request.existingWorkouts) : 'Nenhum'}
-Gere a planilha de treinos até o dia da prova.`;
+
+Regras:
+1. Gere a planilha de treinos até o dia da prova.
+2. Siga as orientações em [META DE RITMO (PACE)] para balizar as zonas de esforço.
+3. Considere a [COMPOSIÇÃO CORPORAL]. Se o % de gordura for alto, inclua treinos metabólicos. Se a massa muscular ou TMB indicarem risco de lesão, priorize hipertrofia e fortalecimento nos treinos de 'STRENGTH'.`;
 
   const response = await fetch(url, {
     method: 'POST',

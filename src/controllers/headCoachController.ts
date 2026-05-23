@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { db } from '@/db';
-import { plannedWorkouts, races } from '@/db/schema';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { plannedWorkouts, races, bioimpedanceLogs } from '@/db/schema';
+import { eq, and, gte, lte, desc, between } from 'drizzle-orm';
 import { askHeadCoach, askHeadCoachForMacrocycle } from '@/services/headCoachService';
 import { athleteRepository } from '@/repositories/athleteRepository';
 
@@ -50,6 +50,33 @@ export const headCoachController = {
       
       const targetRace = raceData[0];
 
+      // Busca a bioimpedância mais recente
+      const lastBio = await db.select().from(bioimpedanceLogs)
+        .where(eq(bioimpedanceLogs.athleteId, athlete.id))
+        .orderBy(desc(bioimpedanceLogs.date))
+        .limit(1);
+      const bioData = lastBio.length > 0 ? lastBio[0] : undefined;
+
+      // Lógica de Smart Pace Conservador (4 a 6%)
+      let paceInstruction = targetRace.targetPace || 'Não definido';
+      if (paceInstruction.toLowerCase() === 'auto') {
+         const similarRaces = await db.select().from(races)
+            .where(between(races.distance, targetRace.distance * 0.9, targetRace.distance * 1.1))
+            .orderBy(desc(races.date));
+         const completedRace = similarRaces.find(r => r.movingTime != null && r.movingTime > 0);
+         if (completedRace) {
+            const paceDecimal = (completedRace.movingTime! / 60) / completedRace.distance;
+            const paceMins = Math.floor(paceDecimal);
+            const paceSecs = Math.round((paceDecimal - paceMins) * 60);
+            const paceStr = `${paceMins}:${paceSecs.toString().padStart(2, '0')}`;
+            paceInstruction = `O atleta concluiu a prova ${completedRace.name} (${completedRace.distance}km) com pace médio de ${paceStr}/km. Estipule um novo Pace Alvo que exija uma melhora progressiva e segura de 4% a 6% e use-o como alvo para estruturar a planilha.`;
+         } else {
+            paceInstruction = `Sem histórico exato. Estipule um Pace Alvo conservador para ${targetRace.distance}km com base na evolução.`;
+         }
+      } else {
+         paceInstruction = `O atleta tem como meta realizar a prova com um pace de ${targetRace.targetPace}. Adapte os treinos com base nessa meta.`;
+      }
+
       const existing = await db.select().from(plannedWorkouts).where(
         and(eq(plannedWorkouts.athleteId, athlete.id), gte(plannedWorkouts.date, new Date()), lte(plannedWorkouts.date, targetRace.date))
       );
@@ -59,7 +86,9 @@ export const headCoachController = {
         targetRaceName: targetRace.name || targetRace.category,
         targetRaceDate: targetRace.date.toISOString(),
         targetDistanceKm: targetRace.distance,
-        existingWorkouts: existing.length > 0 ? existing : undefined
+        targetPaceInstruction: paceInstruction,
+        existingWorkouts: existing.length > 0 ? existing : undefined,
+        bioimpedance: bioData
       });
 
       if (newPlan.length > 0) {

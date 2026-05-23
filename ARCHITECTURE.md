@@ -68,7 +68,7 @@ Drizzle-first: Toda migração de banco via Drizzle CLI.
 1. Gestão de Provas e Macrociclos (16 Semanas)
 O sistema gera ciclos de 16 semanas (3 carga + 1 descarga).
 
-Cadastro de Provas: Suporta importação histórica via Strava e Inclusão Manual de provas futuras. O agendamento manual exige: Nome, Categoria (P1/P2/P3), Data, Distância, Horário da Largada e Local da Largada.
+Cadastro de Provas: Suporta importação histórica via Strava e Inclusão Manual de provas futuras. O agendamento manual exige: Nome, Categoria (P1/P2/P3), Data, Distância, Horário da Largada, Local da Largada e Meta de Ritmo (Pace Alvo).
 
 2. Matriz de Frequência e Overlapping
 Sessões Independentes (UUIDs): Permite múltiplos treinos no mesmo dia.
@@ -126,11 +126,11 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 1: Setup & Fundação** - Configuração Hono, Drizzle ORM, Neon DB e estrutura de pastas modular.
 - [x] **Fase 2: Core de Dados & Telemetria** - Definição do schema DB, Seed inicial, e Webhook do Telegram recebendo o JSON completo da Bioimpedância.
 - [x] **Fase 3: Motor de Relatórios** - Endpoint e Serviço PDFKit para gerar o "Raio-X Fisiológico Mensal" com gráficos nativos, cruzando dados reais do banco.
-- [x] **Fase 4: Single-Tenant Architect** - Refatoração para que o sistema identifique automaticamente o Atleta Principal sem depender de UUIDs na URL.
+- [x] **Fase 4: Single-Tenant Architect** - Refatoração para que o sistema identifique automaticamente o Atleta Principal (ID: `c74d929a-fa77-4e53-9cce-3dbbd2ea73bb`) sem depender de UUIDs na URL.
 - [x] **Fase 5: Integração Strava (SSOT)** - Autenticação OAuth2, webhook de atividades em tempo real (Webhook ID ativo: `348336`), atualização de quilometragem de Tênis (`gear_id`) e importação do histórico de carreira com mapas vetoriais nativos, tempo, pace e clima retroativo (Open-Meteo).
 - [x] **Fase 5.1: Agendamento de Provas** - Rota e serviço de inclusão manual de provas futuras para alimentar o motor de periodização (P1/P2/P3).
 - [x] **Fase 5.2: Planilha de Treinos (JSON)** - Schema DB e endpoint de ingestão de macrociclos (Corrida, Musc, Bike) para o calendário.
-- [ ] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
+- [x] **Fase 6: Clima e Logística** - Chamadas ao OpenWeatherMap para alimentar o Briefing Diário (Logística de baixa de estoque intra-treino no webhook já concluída).
 - [x] **Fase 7: Head Coach IA** - Conectar Gemini/Groq para recálculo de rota, geração autônoma de Macrociclos (estruturado em JSON) e exportação da Planilha em PDF.
 - [ ] **Fase 7.1: Testes do Ciclo** - Realizar testes de ponta a ponta na geração e adaptação do ciclo de treinos estruturado pela IA.
 - [ ] **Fase 8: Segurança e App Mobile** - Firebase Auth e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).

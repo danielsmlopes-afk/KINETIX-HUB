@@ -63,6 +63,7 @@ export const races = pgTable('races', {
   movingTime: integer('moving_time'),
   weather: text('weather'),
   isTarget: boolean('is_target').default(false),
+  targetPace: text('target_pace'),
 });
 
 export const workoutSessions = pgTable('workout_sessions', {

@@ -6,7 +6,7 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { runDailyBriefingJob, runRouteRecalculationJob } from '@/services/cronJobs';
 import { eq, and, inArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { pendingActions, plannedWorkouts, bioimpedanceLogs } from '@/db/schema';
+import { pendingActions, plannedWorkouts, bioimpedanceLogs, races } from '@/db/schema';
 import { env } from '@/config/env';
 import { workoutBatchSchema } from '@/validators/workoutSchema';
 
@@ -24,6 +24,17 @@ const bioimpedanceSchema = z.object({
   health_notes: z.string().optional(),
 });
 
+const raceTelegramSchema = z.object({
+  name: z.string(),
+  category: z.enum(['P1', 'P2', 'P3']),
+  date: z.string().datetime(),
+  distance: z.number(),
+  startTime: z.string(),
+  startLocation: z.string(),
+  isTarget: z.boolean().optional(),
+  targetPace: z.string().min(4),
+});
+
 export const telegramController = {
   async handleWebhook(c: Context) {
     try {
@@ -32,6 +43,43 @@ export const telegramController = {
       // Intercepta mensagens do bot oficial do Telegram (Humano no Ciclo)
       if (body.message && typeof body.message.text === 'string') {
         const text = body.message.text.trim();
+
+        if (text.toUpperCase() === '/AJUDA' || text.toUpperCase() === '/HELP') {
+          const helpMessage = `🤖 *KINETIX HUB - Central de Comandos*
+
+Aqui estão os modelos para enviar dados via Telegram. Basta copiar o bloco de código, preencher com seus dados e enviar!
+
+*1. Registrar uma Prova Alvo:*
+\`\`\`json
+{
+  "name": "Nike SP 21K",
+  "category": "P1",
+  "date": "2026-07-26T06:00:00Z",
+  "distance": 21.1,
+  "startTime": "06:00",
+  "startLocation": "São Paulo, SP",
+  "isTarget": true,
+  "targetPace": "4:55 a 5:05"
+}
+\`\`\`
+
+*2. Registrar uma Bioimpedância:*
+\`\`\`json
+{
+  "date": "2026-05-23T08:00:00Z",
+  "weight": 75.0, "body_fat": 15.5, "muscle_mass": 35.0, "body_water": 60.0, "visceral_fat": 8, "metabolic_age": 28, "tmb": 1850, "protein": 14.5, "bone_mass": 3.1
+}
+\`\`\`
+
+*3. Aprovar Sugestão da IA:*
+Para aprovar um recálculo de rota sugerido pelo Head Coach, simplesmente responda à mensagem com:
+\`OK\``;
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: helpMessage, parse_mode: 'Markdown' })
+          });
+          return c.text('HELP_SENT', 200);
+        }
         
         if (text.toUpperCase() === 'OK') {
           const athlete = await athleteRepository.getPrimaryAthlete();
@@ -88,7 +136,30 @@ export const telegramController = {
               }
             }
 
-            // 2. Se não for bioimpedância, assume que é treino
+            // 2. Tenta validar como Prova
+            const raceParsed = raceTelegramSchema.safeParse(parsedJson);
+            if (raceParsed.success) {
+              const athlete = await athleteRepository.getPrimaryAthlete();
+              if (athlete) {
+                await db.insert(races).values({
+                  name: raceParsed.data.name,
+                  category: raceParsed.data.category,
+                  date: new Date(raceParsed.data.date),
+                  distance: raceParsed.data.distance,
+                  startTime: raceParsed.data.startTime,
+                  startLocation: raceParsed.data.startLocation,
+                  isTarget: raceParsed.data.isTarget,
+                  targetPace: raceParsed.data.targetPace,
+                });
+                await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: "✅ *Prova Registrada!*\nSua prova foi adicionada ao calendário com sucesso.", parse_mode: 'Markdown' })
+                });
+                return c.text('RACE_IMPORTED', 200);
+              }
+            }
+
+            // 3. Se não for bioimpedância nem prova, assume que é treino
             let workoutsToParse = parsedJson;
 
             // "Tradutor" para o formato de planilha que você enviou
