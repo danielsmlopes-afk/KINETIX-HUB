@@ -24,6 +24,9 @@ const envSchema = z.object({
   MAPS_BASE_URL: z.string().optional(),
   UPTIMEROBOT_API_KEY: z.string().min(1),
   UPTIMEROBOT_MONITOR_ID: z.string().min(1),
+  FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_CLIENT_EMAIL: z.string().optional(),
+  FIREBASE_PRIVATE_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

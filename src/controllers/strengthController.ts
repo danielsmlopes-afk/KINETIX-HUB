@@ -18,10 +18,41 @@ export const strengthController = {
     }
   },
 
+  async getTemplateExercises(c: Context) {
+    try {
+      const templateId = c.req.param('id');
+
+      if (!templateId) {
+        return c.json({ error: "O parâmetro ID da ficha é obrigatório.", code: "MISSING_PARAM" }, 400);
+      }
+      
+      const exercises = await db.select({
+        id: workoutTemplateItems.id,
+        templateId: workoutTemplateItems.templateId,
+        exerciseId: exerciseLibrary.id,
+        exerciseName: exerciseLibrary.name,
+        sets: workoutTemplateItems.sets,
+        reps: workoutTemplateItems.reps,
+        notes: workoutTemplateItems.notes
+      })
+      .from(workoutTemplateItems)
+      .innerJoin(exerciseLibrary, eq(workoutTemplateItems.exerciseId, exerciseLibrary.id))
+      .where(eq(workoutTemplateItems.templateId, templateId));
+
+      return c.json({ data: exercises }, 200);
+    } catch (error) {
+      console.error('❌ [STRENGTH CONTROLLER] Erro ao buscar exercícios do template:', error);
+      return c.json({ error: "Erro interno ao buscar exercícios.", code: "FETCH_ERR" }, 500);
+    }
+  },
+
   async logWorkout(c: Context) {
     try {
       const body = await c.req.json().catch(() => ({}));
-      const { templateName = 'Treino de Força', durationMinutes = 60, exercises = [] } = body;
+      const { templateName = 'Treino de Força', durationMinutes = 60, exercises = [], logs = [] } = body;
+
+      // Faz a ponte inteligente caso os dados venham do App Flutter (logs) ou de outro lugar (exercises)
+      const itemsToLog = logs.length > 0 ? logs : exercises;
 
       const athlete = await athleteRepository.getPrimaryAthlete();
       if (!athlete) {
@@ -35,8 +66,8 @@ export const strengthController = {
       }).returning();
 
       // Gravar o array de exercícios realizados
-      if (Array.isArray(exercises) && exercises.length > 0) {
-        const logsToInsert = exercises.map((ex: any) => ({
+      if (Array.isArray(itemsToLog) && itemsToLog.length > 0) {
+        const logsToInsert = itemsToLog.map((ex: any) => ({
           sessionId: session.id,
           exerciseId: ex.exerciseId,
           actualSets: ex.actualSets,

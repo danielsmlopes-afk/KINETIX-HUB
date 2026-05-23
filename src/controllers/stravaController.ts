@@ -132,19 +132,41 @@ export const stravaController = {
                 actualPace = `${mins}:${secs.toString().padStart(2, '0')}`;
               }
 
-              const feedback = await coachService.analyzeRun({
-                plannedDistance, plannedPace, actualDistance, actualPace
-              });
+              // Lógica da Fase 11: Análise Profunda para Provas ou Longões de Domingo
+              const isRace = activity.workout_type === 1 || activity.name.toLowerCase().includes('prova');
+              const isLongRun = activity.distance > 10000 || activity.workout_type === 2; // > 10km
 
-              await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  chat_id: env.TELEGRAM_CHAT_ID, 
-                  text: `🏃‍♂️ *Auditoria de Corrida*\n\n${feedback}`, 
-                  parse_mode: 'Markdown' 
-                })
-              });
+              if (isRace || isLongRun) {
+                const totalSeconds = activity.moving_time;
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = totalSeconds % 60;
+                const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+                const feedback = await coachService.analyzeRaceOrLongRun({
+                  name: activity.name,
+                  distance: actualDistance,
+                  pace: actualPace,
+                  time: timeStr,
+                  elevation: (activity.total_elevation_gain || 0).toString(),
+                  isRace
+                });
+
+                await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: `🏆 *Relatório Técnico: ${isRace ? 'Prova' : 'Longão'}*\n\n${feedback}`, parse_mode: 'Markdown' })
+                });
+              } else {
+                // Treinos comuns do dia-a-dia
+                const feedback = await coachService.analyzeRun({
+                  plannedDistance, plannedPace, actualDistance, actualPace
+                });
+
+                await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: `🏃‍♂️ *Auditoria de Corrida*\n\n${feedback}`, parse_mode: 'Markdown' })
+                });
+              }
             }
           }
         }).catch(err => console.error('Erro no processamento do webhook:', err.message));

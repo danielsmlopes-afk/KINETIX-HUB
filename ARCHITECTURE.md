@@ -32,6 +32,8 @@ kinetix-api/
     │   └── env.ts              # Validação Zod estrita do .env
     ├── controllers/
     │   ├── athleteController.ts  # Retorna dados do atleta principal (Single-Tenant)
+    │   ├── gearController.ts     # Gerencia frota de tênis e quilometragem
+    │   ├── strengthController.ts # Operações do IronLog (Templates e Execução)
     │   ├── reportController.ts   # Orquestração do download de PDFs
     │   ├── telegramController.ts # Recepção de webhooks e comandos do Telegram
     │   └── webhookController.ts  # Orquestra disparos autônomos seguros (x-cron-secret)
@@ -155,6 +157,21 @@ Esses dados alimentam diretamente o calendário do atleta e cruzam com o "Briefi
 - [x] **Fase 7.2: Webhooks Estratégicos** - Controladores e rotas criados para Weather-Pacing, ACWR e Manutenção DB via cron-job.org.
 - [x] **Fase 7.3: Serviços de Automação** - Stubs substituídos por serviços reais com integrações do Drizzle e APIs externas.
 - [x] **Fase 7.4: Auditoria IA Pós-Treino (Strava)** - Análise de Corridas via Groq/Llama3 comparando Pace/Distância Planejado vs Realizado e envio de feedback no Telegram.
+- [x] **Fase 7.5: Refatoração Clean Architecture (Telegram)** - Isolamento do roteamento lógico no `telegramMessageService`, blindando o webhook contra timeouts e loop infinito.
+- [x] **Fase 8: Segurança e App Mobile (Core)** - Arquitetura base implementada (Firebase Auth, JWT Injection via `ApiClient`, Padrão Monousuário) e telas de Dashboard, Planilha e Lab concluídas no Flutter.
 - [x] **Fase 9: Gestão Dinâmica de Força (IronLog_V2)** - Tabela `strength_logs` e reestruturação da biblioteca de Fichas (A, B, C) via Seed. Endpoints para log de força, API de auditoria (`/audit`), geração vetorial do Dossiê Tático em PDF e comando nativo `/auditoria` no Telegram Bot.
-- [ ] **Fase 8: Segurança e App Mobile** - Implementar arquitetura base para Firebase Auth no backend (validação JWT) e construção das telas no Flutter (Dashboard, Planilha, Lab, Arsenal, Dossiês).
+- [x] **Fase 10: Telas Finais do App Mobile** - Guias "Arsenal" e "Dossiês" concluídas. Download e abertura de PDFs diretamente pelo celular via `path_provider` e `open_file`.
 - [ ] **DevOps / Infra:** Configurar a "Maintenance Window" nativa no painel do UptimeRobot (das 00:01 às 05:59) e remover as funções obsoletas de `toggleMonitor` no `cronJobs.ts` para poupar o Render Free Tier.
+
+## 🔮 Futuro e Expansão (Novas Missões)
+- [x] **Fase 11: Análise Técnica de Domingo (Longão/Prova)** - Ao identificar uma corrida acima de 15km ou classificada como prova via Strava, o Head Coach IA emite um relatório técnico profundo (altimetria, pace, desgaste sistêmico) via Telegram.
+- [ ] **Fase 12: Logística de Deslocamento Pré-Prova** - Evoluir o Briefing da Véspera de Prova. O sistema calculará automaticamente a distância entre a casa do atleta e a "startLocation", recomendando horário de despertar (ex: 45 min antes de sair) e tempo de viagem (chegar com 1h de antecedência).
+- [ ] **Fase 13: Arquitetura Multi-Tenant (Casal)** - Adaptar o Drizzle ORM (`firebaseUid`, `stravaAthleteId`) e o Middleware JWT para permitir que o KINETIX HUB isole e gerencie perfeitamente os dados e planilhas da esposa do atleta simultaneamente.
+- [ ] **Fase 14: Integração de Readiness/Recuperação** - Conectar a telemetria do Apple Health, Oura ou Garmin (HRV, Sono) para que o "Recálculo de Rota" diminua o volume da planilha proativamente em dias de baixa recuperação fisiológica.
+
+## 🧪 Dados Mockados & Technical Debt
+
+> **REGRA DE OURO:** Qualquer dado mockado introduzido no sistema para não bloquear o avanço do Frontend deve ser OBRIGATORIAMENTE registrado nesta seção com a flag `[TO-DO: MOCK]` e priorizado para integração real com o Drizzle ORM o mais breve possível.
+
+### Pendências Atuais:
+- Nenhuma pendência de mock no momento. Todo o contrato consumido pelo Dashboard está operando com dados reais e relacionais! 🚀

@@ -160,5 +160,25 @@ export const reportController = {
     } catch (error) {
       return c.json({ error: "Erro ao gerar Auditoria de Força em PDF.", code: "PDF_ERR" }, 500);
     }
+  },
+
+  async listReports(c: Context) {
+    try {
+      // Relação de Relatórios Disponíveis no Painel
+      const reports = [
+        {
+          id: 'planilha-oficial',
+          title: 'Planilha de Treinos (Macrociclo)',
+          description: 'Dossiê contendo todo o macrociclo agendado (Pace, Distâncias, Força).',
+          date: new Date().toISOString(),
+          type: 'PDF',
+          downloadUrl: '/reports/plan'
+        }
+      ];
+      return c.json({ data: reports }, 200);
+    } catch (error) {
+      console.error('❌ Erro ao listar dossiês:', error);
+      return c.json({ error: "Erro interno ao listar relatórios.", code: "LIST_ERR" }, 500);
+    }
   }
 };

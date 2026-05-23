@@ -4,6 +4,7 @@ import { reportController } from '@/controllers/reportController';
 
 export const reportRoutes = new Hono();
 
+reportRoutes.get('/list', reportController.listReports);
 reportRoutes.get('/xray/:month/:year', reportController.downloadXRay);
 reportRoutes.get('/race/:raceId', reportController.downloadRaceReport);
 reportRoutes.get('/career', reportController.downloadCareerReport);
