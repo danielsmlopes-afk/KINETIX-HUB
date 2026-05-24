@@ -5,6 +5,7 @@ import { pendingActions, plannedWorkouts, bioimpedanceLogs, races, workoutSessio
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { telemetryRepository } from '@/repositories/telemetryRepository';
 import { env } from '@/config/env';
+import { briefingService } from './briefingService';
 import { workoutBatchSchema } from '@/validators/workoutSchema';
 
 const bioSchema = z.object({
@@ -29,7 +30,7 @@ export const telegramMessageService = {
     const cmd = text.trim().toUpperCase();
 
     if (cmd === '/AJUDA' || cmd === '/HELP') {
-      const help = `🤖 *KINETIX HUB - Central*\n\n*1. Prova Alvo (JSON):*\n\`\`\`json\n{"name":"Prova","category":"P1","date":"2026-10-10T06:00:00Z","distance":21,"startTime":"06:00","startLocation":"SP","targetPace":"5:00"}\n\`\`\`\n*2. Auditoria:* Envie \`/auditoria\`\n*3. IA:* Responda \`OK\` p/ aprovar recálculos.`;
+      const help = `🤖 *KINETIX HUB - Central*\n\n*1. Prova Alvo (JSON):*\n\`\`\`json\n{"name":"Prova","category":"P1","date":"2026-10-10T06:00:00Z","distance":21,"startTime":"06:00","startLocation":"SP","targetPace":"5:00"}\n\`\`\`\n*2. Auditoria:* Envie \`/auditoria\`\n*3. Briefing:* Envie \`/briefing\` para o resumo de amanhã\n*4. IA:* Responda \`OK\` p/ aprovar recálculos.`;
       return sendMsg(chatId, help);
     }
 
@@ -59,6 +60,11 @@ export const telegramMessageService = {
       
       const url = `${process.env.RENDER_EXTERNAL_URL || 'https://kinetix-api-7jld.onrender.com'}/api/reports/strength-audit/${last[0].sId}?templateId=${tpl[0].tId}`;
       return sendMsg(chatId, `📄 *Auditoria de Força*\n\n🔗 Download do Dossiê PDF`);
+    }
+
+    if (cmd === '/BRIEFING') {
+      const briefing = await briefingService.generateDailyBriefing();
+      return sendMsg(chatId, briefing);
     }
 
     const jsonMatch = text.match(/[\{\[][\s\S]*[\}\]]/);

@@ -31,8 +31,6 @@ export const briefingService = {
             lt(plannedWorkouts.date, dayAfter)
           )
         );
-      
-      const workout = workouts.length > 0 ? workouts[0] : null;
 
       // 4. Integração OpenWeatherMap (Previsão preditiva)
       let weatherInfo = '🌡️ Clima: Previsão Indisponível (Sem chave de API configurada)';
@@ -52,49 +50,65 @@ export const briefingService = {
       briefing += `🗓️ *Data:* ${tomorrow.toLocaleDateString('pt-BR')}\n`;
       briefing += `${weatherInfo}\n\n`;
 
-      if (workout) {
-        const details = (workout.details as Record<string, any>) || {};
+      if (workouts.length > 0) {
+        briefing += `🏃 *MISSÃO DE AMANHÃ (${workouts.length} TREINO${workouts.length > 1 ? 'S' : ''}):*\n\n`;
         
-        // Inteligência Logística: Estimar Duração e Géis
-        let gelAdvice = `- Planejar nutrição intra-treino conforme o cronograma.\n`;
-        const subtitle = String(details.subtitle || '');
-        const distMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km/i);
-        let durationMins = 0;
+        let totalGels = 0;
+        let requiresGels = false;
+        let hasOutdoor = false;
+        let hasLab = false;
 
-        if (distMatch) {
-          const dist = parseFloat(distMatch[1].replace(',', '.'));
-          const speedMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km\/h/i);
-          const paceMatch = subtitle.match(/(\d{1,2}):(\d{2})/);
+        workouts.forEach((workout, index) => {
+          const details = (workout.details as Record<string, any>) || {};
+          
+          let durationMins = 0;
+          const subtitle = String(details.subtitle || '');
+          const distMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km/i);
 
-          if (speedMatch) {
-            const speed = parseFloat(speedMatch[1].replace(',', '.'));
-            if (speed > 0) durationMins = (dist / speed) * 60;
-          } else if (paceMatch) {
-            const mins = parseInt(paceMatch[1], 10);
-            const secs = parseInt(paceMatch[2], 10);
-            durationMins = dist * (mins + (secs / 60));
+          if (distMatch) {
+            const dist = parseFloat(distMatch[1].replace(',', '.'));
+            const speedMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km\/h/i);
+            const paceMatch = subtitle.match(/(\d{1,2}):(\d{2})/);
+
+            if (speedMatch) {
+              const speed = parseFloat(speedMatch[1].replace(',', '.'));
+              if (speed > 0) durationMins = (dist / speed) * 60;
+            } else if (paceMatch) {
+              const mins = parseInt(paceMatch[1], 10);
+              const secs = parseInt(paceMatch[2], 10);
+              durationMins = dist * (mins + (secs / 60));
+            }
           }
-        }
 
-        if (durationMins >= 60) {
-          let gels = 1;
-          const remaining = durationMins - 60;
-          if (remaining >= 30) gels += Math.floor(remaining / 30);
-          gels += 1; // 1 de Segurança/Reserva
-          gelAdvice = `- Levar ${gels}x Géis de Carboidrato (Tome 1 aos 45-60min, e depois a cada 30-45min. 1 é extra/reserva).\n`;
-        }
+          if (durationMins >= 60) {
+            requiresGels = true;
+            let gels = 1;
+            const remaining = durationMins - 60;
+            if (remaining >= 30) gels += Math.floor(remaining / 30);
+            gels += 1; // 1 de Segurança/Reserva
+            totalGels += gels;
+          }
 
-        briefing += `🏃 *MISSÃO DE AMANHÃ:*\n`;
-        briefing += `🔸 *Modalidade:* ${workout.activityType}\n`;
-        briefing += `🔸 *Foco:* ${workout.title}\n`;
-        if (details.subtitle) briefing += `🔸 *Série:* ${details.subtitle}\n\n`;
+          if (workout.activityType === 'RUN' || workout.activityType === 'BIKE') {
+            hasOutdoor = true;
+          } else {
+            hasLab = true;
+          }
+
+          briefing += `🔸 *Treino ${index + 1}:* ${workout.activityType} - ${workout.title}\n`;
+          if (details.subtitle) briefing += `   *Série:* ${details.subtitle}\n\n`;
+        });
         
         briefing += `🎒 *CHECKLIST LOGÍSTICO:*\n`;
-        if (workout.activityType === 'RUN' || workout.activityType === 'BIKE') {
+        if (hasOutdoor) {
           briefing += `- Equipamento esportivo e GPS na carga.\n`;
-          briefing += gelAdvice;
-        } else {
+        }
+        if (hasLab) {
           briefing += `- Fichas preparadas. Prevenção e hipertrofia no Lab.\n`;
+        }
+        if (requiresGels) {
+          briefing += `- Planejar nutrição intra-treino conforme o cronograma.\n`;
+          briefing += `- Levar ${totalGels}x Géis de Carboidrato (Tome 1 aos 45-60min, e depois a cada 30-45min. Considerado +1 de reserva por treino longo).\n`;
         }
       } else {
         briefing += `🧘 *MISSÃO DE AMANHÃ:*\n`;

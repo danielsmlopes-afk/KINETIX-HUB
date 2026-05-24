@@ -2,7 +2,7 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { athletes, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
-import { eq, desc, gte } from 'drizzle-orm';
+import { eq, desc, gte, and, asc } from 'drizzle-orm';
 
 export const athleteController = {
   async getProfile(c: Context) {
@@ -28,10 +28,13 @@ export const athleteController = {
       } : undefined;
 
       // 3. Busca Próximas Provas Alvo
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const upcomingRacesDb = await db.select()
         .from(races)
-        .where(gte(races.date, new Date())) // Filtrando do dia atual em diante
-        .orderBy(races.date)
+        .where(gte(races.date, today)) // Filtrando do dia atual em diante
+        .orderBy(asc(races.date))
         .limit(3);
 
       const upcomingRaces = upcomingRacesDb.map(r => ({
@@ -43,19 +46,57 @@ export const athleteController = {
       // 4. Busca os Próximos Treinos Planejados do Macrociclo
       const upcomingWorkoutsDb = await db.select()
         .from(plannedWorkouts)
-        .where(eq(plannedWorkouts.athleteId, athlete.id))
-        .orderBy(desc(plannedWorkouts.date))
+        .where(
+          and(
+            eq(plannedWorkouts.athleteId, athlete.id),
+            gte(plannedWorkouts.date, today)
+          )
+        )
+        .orderBy(asc(plannedWorkouts.date))
         .limit(5);
 
-      const upcomingWorkouts = upcomingWorkoutsDb.reverse().map(w => {
+      // 5. Integração Tática com OpenWeatherMap para o Clima (Previsão de 5 dias)
+      let weatherForecasts: any[] = [];
+      const apiKey = process.env.OPENWEATHER_API_KEY;
+      if (apiKey) {
+        try {
+          const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=Sao%20Paulo,BR&units=metric&lang=pt_br&appid=${apiKey}`);
+          if (res.ok) {
+            const data = await res.json();
+            weatherForecasts = data.list || [];
+          }
+        } catch (e) {
+          console.error('❌ Erro ao buscar clima no OpenWeatherMap:', e);
+        }
+      }
+
+      const upcomingWorkouts = upcomingWorkoutsDb.map(w => {
         // Garantia de fallback para o campo JSONB
         const details = (w.details as Record<string, any>) || {};
+        const workoutDate = new Date(w.date);
+        
+        let weatherStr = '🌤️ Clima: Aguardando telemetria...';
+        if (apiKey && weatherForecasts.length > 0) {
+          const dateString = workoutDate.toISOString().split('T')[0];
+          // Procura previsão para às 12:00:00 daquele dia (ou a mais próxima)
+          const targetTime = `${dateString} 12:00:00`;
+          let forecast = weatherForecasts.find((f: any) => f.dt_txt === targetTime);
+          if (!forecast) { forecast = weatherForecasts.find((f: any) => f.dt_txt?.startsWith(dateString)); }
+
+          if (forecast) {
+            weatherStr = `🌤️ ${forecast.weather[0].description}, ${Math.round(forecast.main.temp)}°C`;
+          } else {
+            weatherStr = '🌤️ Clima: Previsão estendida não disponível para o dia';
+          }
+        }
+
         return {
           id: w.id,
-          date: new Date(w.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }),
+          date: workoutDate.toISOString().split('T')[0], // YYYY-MM-DD para o app processar
           activityType: w.activityType,
           title: w.title,
-          subtitle: details.subtitle || 'Treino Estruturado'
+          subtitle: details.subtitle || 'Treino Estruturado',
+          weather: weatherStr
         };
       });
 
