@@ -38,9 +38,8 @@ export const telegramController = {
   async handleCron(c: Context) {
     try {
       const authHeader = c.req.header('Authorization') || c.req.header('x-cron-secret');
-      const expectedSecret = process.env.TELEGRAM_CRON_SECRET || '12345';
       
-      if (authHeader !== expectedSecret) {
+      if (authHeader !== env.CRON_SECRET) {
         return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
       }
 
@@ -61,9 +60,8 @@ export const telegramController = {
   async handleRecalculate(c: Context) {
     try {
       const authHeader = c.req.header('Authorization') || c.req.header('x-cron-secret');
-      const expectedSecret = process.env.TELEGRAM_CRON_SECRET || '12345';
       
-      if (authHeader !== expectedSecret) {
+      if (authHeader !== env.CRON_SECRET) {
         return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
       }
 

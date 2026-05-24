@@ -14,7 +14,14 @@ import { firebaseAuthMiddleware } from '@/config/authMiddleware';
 
 export const apiRoutes = new Hono();
 
-// Grupo de rotas privadas do App (requer Firebase Auth)
+// 1. ROTAS PÚBLICAS E WEBHOOKS (Devem ser processadas ANTES do middleware JWT)
+apiRoutes.post('/webhook/telegram', telegramController.handleWebhook);
+apiRoutes.get('/cron/daily', telegramController.handleCron);
+apiRoutes.get('/cron/recalculate', telegramController.handleRecalculate);
+apiRoutes.route('/strava', stravaRoutes);
+apiRoutes.route('/', webhookRoutes);
+
+// 2. ROTAS PRIVADAS DO APP (Requerem Firebase Auth)
 const privateAppRoutes = new Hono();
 privateAppRoutes.use('*', firebaseAuthMiddleware);
 privateAppRoutes.get('/athlete/profile', athleteController.getProfile);
@@ -25,12 +32,5 @@ privateAppRoutes.route('/import', importRoutes);
 privateAppRoutes.route('/coach', coachRoutes);
 privateAppRoutes.route('/gear', gearRoutes);
 
-// Monta o grupo protegido na API
+// Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);
-
-// Rotas públicas (Webhooks, Cron, Strava OAuth)
-apiRoutes.post('/webhook/telegram', telegramController.handleWebhook);
-apiRoutes.get('/cron/daily', telegramController.handleCron);
-apiRoutes.get('/cron/recalculate', telegramController.handleRecalculate);
-apiRoutes.route('/strava', stravaRoutes);
-apiRoutes.route('/', webhookRoutes);
