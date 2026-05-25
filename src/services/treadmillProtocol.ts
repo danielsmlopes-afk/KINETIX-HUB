@@ -3,6 +3,43 @@ export const TREADMILL_CONSTANTS = {
   COOLDOWN_KMH: 4.5,
 };
 
+export interface PlannedTreadmillDetails {
+  targetDistanceKm: number;
+  targetPace?: string;
+  intervals?: Array<{ distanceMeters: number; speedKmh: number }>;
+}
+
+export interface StravaTreadmillData {
+  distanceKm: number;
+  movingTimeSeconds: number;
+  laps?: Array<{ distanceMeters: number; movingTimeSeconds: number }>;
+}
+
+/**
+ * Valida se um treino executado indoor (esteira) está em conformidade com o planejado.
+ */
+export function validateTreadmillIntervals(planned: PlannedTreadmillDetails, actual: StravaTreadmillData): boolean {
+  if (planned.targetDistanceKm <= 0) return true; // Treino livre
+
+  // 1. Validação de Volume (Tolerância de ±3%)
+  const minDistance = planned.targetDistanceKm * 0.97;
+  const maxDistance = planned.targetDistanceKm * 1.03;
+  const isVolumeValid = actual.distanceKm >= minDistance && actual.distanceKm <= maxDistance;
+
+  // 2. Validação de Intensidade (Reconstrução pelo Pace/Tempo total caso não existam laps detalhados)
+  let isIntensityValid = true;
+  if (planned.targetPace && planned.targetPace !== 'Livre') {
+    const [min, sec] = planned.targetPace.replace(' min/km', '').split(':').map(Number);
+    const targetPaceSecs = (min * 60) + (sec || 0);
+    const actualPaceSecs = actual.distanceKm > 0 ? actual.movingTimeSeconds / actual.distanceKm : 0;
+    
+    // Tolerância na esteira de ±10s/km (ambiente controlado)
+    isIntensityValid = Math.abs(actualPaceSecs - targetPaceSecs) <= 10;
+  }
+
+  return isVolumeValid && isIntensityValid;
+}
+
 export function evaluateTreadmillRest(distanceMeters: number): 'Repouso Passivo' | 'Repouso Ativo' {
   return distanceMeters <= 800 ? 'Repouso Passivo' : 'Repouso Ativo';
 }

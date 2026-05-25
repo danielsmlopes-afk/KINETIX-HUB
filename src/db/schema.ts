@@ -40,6 +40,8 @@ export const workoutTemplates = pgTable('workout_templates', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull().unique(),
   description: text('description'),
+  warmup: text('warmup'),
+  cooldown: text('cooldown'),
 });
 
 export const workoutTemplateItems = pgTable('workout_template_items', {
@@ -75,6 +77,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   distance: doublePrecision('distance'),
   gearId: text('gear_id'),
   averageHeartRate: integer('average_heartrate'),
+  warmup: text('warmup'),
+  cooldown: text('cooldown'),
 });
 
 export const treadmillIntervals = pgTable('treadmill_intervals', {
@@ -106,8 +110,11 @@ export const plannedWorkouts = pgTable('planned_workouts', {
   date: timestamp('date').notNull(),
   activityType: text('activity_type').notNull(),
   title: text('title').notNull(),
+  warmup: text('warmup'),
+  cooldown: text('cooldown'),
   details: jsonb('details'),
   isImported: boolean('is_imported').default(true),
+  complianceStatus: text('compliance_status'), // 'VALIDATED' | 'COMPLETED_NOT_VALIDATED' | null
 });
 
 export const cronLogs = pgTable('cron_logs', {

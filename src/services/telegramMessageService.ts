@@ -7,6 +7,7 @@ import { telemetryRepository } from '@/repositories/telemetryRepository';
 import { env } from '@/config/env';
 import { briefingService } from './briefingService';
 import { workoutBatchSchema } from '@/validators/workoutSchema';
+import type { StravaRunData } from './coachService';
 
 const bioSchema = z.object({
   date: z.string(), weight: z.number(), body_fat: z.number(), muscle_mass: z.number(), body_water: z.number(),
@@ -26,6 +27,28 @@ async function sendMsg(chatId: number, text: string): Promise<void> {
 }
 
 export const telegramMessageService = {
+  async sendCoachFeedback(stravaData: StravaRunData, aiAnalysis: string): Promise<void> {
+    try {
+      console.log(`[Telegram] Formatando dossiê de telemetria para a atividade ${stravaData.id}...`);
+      
+      const chatId = Number(env.TELEGRAM_CHAT_ID);
+      if (!chatId) throw new Error('TELEGRAM_CHAT_ID não configurado ou inválido.');
+
+      const message = `🏃‍♂️ *RELATÓRIO DE TELEMETRIA TÁTICA* 🏃‍♂️\n\n` +
+        `*Operação:* ${stravaData.name}\n` +
+        `📈 *Distância:* ${stravaData.distanceKm} km\n` +
+        `⏱️ *Pace Médio:* ${stravaData.paceStr} /km\n` +
+        `🏔️ *Altimetria:* ${stravaData.elevationGain} m\n\n` +
+        `🤖 *PARECER DO HEAD COACH IA:*\n` +
+        `${aiAnalysis}`;
+
+      await sendMsg(chatId, message);
+      console.log(`✅ [Telegram] Dossiê enviado com sucesso ao Comandante.`);
+    } catch (error) {
+      console.error('❌ [Telegram] Falha ao enviar o feedback do Coach:', error);
+    }
+  },
+
   async processIncomingMessage(chatId: number, text: string): Promise<void> {
     const cmd = text.trim().toUpperCase();
 

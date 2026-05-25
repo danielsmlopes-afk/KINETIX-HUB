@@ -13,12 +13,17 @@ export interface StravaActivity {
   total_elevation_gain: number;
   average_speed?: number;
   average_heartrate?: number;
+  trainer?: boolean;
   workout_type?: number; // 1 = Race (Prova), 2 = Long Run, 3 = Workout
   start_latlng?: [number, number];
   map?: {
     id: string;
     summary_polyline: string;
   };
+  laps?: Array<{
+    distance: number;
+    moving_time: number;
+  }>;
 }
 
 export class StravaService {

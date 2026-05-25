@@ -1,11 +1,8 @@
 import { Hono } from 'hono';
-import { stravaController } from '../controllers/stravaController';
+import { stravaController } from '@/controllers/stravaController';
 
-const stravaRoutes = new Hono();
+export const stravaRoutes = new Hono();
 
-stravaRoutes.get('/login', stravaController.login);
-stravaRoutes.get('/callback', stravaController.callback);
-stravaRoutes.get('/webhook', stravaController.verifyWebhook);
+// Endpoint único de Webhook: Responde a GET (desafio do Strava) e POST (dados em tempo real)
+stravaRoutes.get('/webhook', stravaController.handleWebhook);
 stravaRoutes.post('/webhook', stravaController.handleWebhook);
-
-export { stravaRoutes };

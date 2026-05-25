@@ -11,6 +11,7 @@ import { coachRoutes } from '@/routes/coachRoutes';
 import { webhookRoutes } from '@/routes/webhookRoutes';
 import { gearRoutes } from '@/routes/gearRoutes';
 import { firebaseAuthMiddleware } from '@/config/authMiddleware';
+import { dossierController } from '@/controllers/dossierController';
 
 export const apiRoutes = new Hono();
 
@@ -25,6 +26,7 @@ apiRoutes.route('/', webhookRoutes);
 const privateAppRoutes = new Hono();
 privateAppRoutes.use('*', firebaseAuthMiddleware);
 privateAppRoutes.get('/athlete/profile', athleteController.getProfile);
+privateAppRoutes.get('/athlete/dossier', dossierController.getDossier);
 privateAppRoutes.route('/reports', reportRoutes);
 privateAppRoutes.route('/strength', strengthRoutes);
 privateAppRoutes.route('/races', racesRouter);

@@ -237,7 +237,13 @@ export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
         else if (w.activityType === 'BIKE') emoji = '🚴‍♂️';
         else if (w.activityType === 'STRENGTH') emoji = '🏋️‍♂️';
 
-        doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${dateStr} - ${emoji} ${w.activityType}: ${w.title}`);
+        let statusBadge = '';
+        if (w.complianceStatus === 'VALIDATED') statusBadge = ' [✅ Cumprido]';
+        else if (w.complianceStatus === 'COMPLETED_NOT_VALIDATED') statusBadge = ' [❌ Fora da Meta]';
+        // Marca como pendente/atrasado caso a data da atividade já tenha passado e ela não tenha status
+        else if (!w.complianceStatus && w.date.getTime() < Date.now()) statusBadge = ' [⚠️ Pendente]';
+
+        doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${dateStr} - ${emoji} ${w.activityType}: ${w.title}${statusBadge}`);
         
         let detailsStr = '';
         if (w.details && typeof w.details === 'object') {

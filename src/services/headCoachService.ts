@@ -91,6 +91,8 @@ export interface MacrocycleWorkout {
   date: string;
   activityType: 'RUN' | 'BIKE' | 'STRENGTH';
   title: string;
+  warmup?: string | null;
+  cooldown?: string | null;
   details: Record<string, unknown>;
 }
 
@@ -103,9 +105,9 @@ export async function askHeadCoachForMacrocycle(request: MacrocycleGenerationReq
 Sua tarefa é gerar ou adaptar um macrociclo de treinos (corrida, bike, musculação) para o atleta, com foco na prova alvo.
 A planilha deve progredir gradativamente até a data da prova, respeitando a regra de periodização (ex: 3 semanas de carga + 1 de descarga).
 Se houver treinos existentes, adapte a planilha considerando a nova prova (ex: adicionar treinos específicos e polimento).
-Você DEVE retornar EXATAMENTE um JSON array válido com os treinos. Formato:
+Você DEVE retornar EXATAMENTE um JSON array válido com os treinos. Sempre forneça recomendações estruturadas para o aquecimento (warmup) e desaquecimento (cooldown) quando aplicável. Se não houver, retorne null. Formato:
 [
-  { "date": "YYYY-MM-DDT06:00:00Z", "activityType": "RUN", "title": "Rodagem Leve", "details": { "distanceKm": 8, "pace": "5:30" } }
+  { "date": "YYYY-MM-DDT06:00:00Z", "activityType": "RUN", "title": "Rodagem Leve", "warmup": "10 min trote leve + educativos", "cooldown": "5 min caminhada leve", "details": { "distanceKm": 8, "pace": "5:30" } }
 ]`;
   
   const fullPrompt = `[ATLETA]: ${request.athleteName}
