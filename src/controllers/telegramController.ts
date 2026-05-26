@@ -1,7 +1,6 @@
 // Arquivo: src/controllers/telegramController.ts
 import { Context } from 'hono';
-import { runRouteRecalculationJob } from '@/services/cronJobs';
-import { briefingService } from '@/services/briefingService';
+import { runRouteRecalculationJob, runDailyBriefingJob } from '@/services/cronJobs';
 import { env } from '@/config/env';
 import { telegramMessageService } from '@/services/telegramMessageService';
 
@@ -43,13 +42,7 @@ export const telegramController = {
         return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
       }
 
-      // Aciona o Head Coach IA para gerar a narrativa
-      const briefingMessage = await briefingService.generateDailyBriefing();
-      
-      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: briefingMessage, parse_mode: 'Markdown' })
-      });
+      await runDailyBriefingJob();
 
       return c.json({ data: { message: "Cron executado e briefing enviado ao Telegram." } });
     } catch (error) {
