@@ -46,6 +46,8 @@ export const coachService = {
       let targetPace = 'Livre';
       let plannedWarmup = 'Não especificado';
       let plannedCooldown = 'Não especificado';
+      let plannedRest = '';
+      let plannedIntervals: Array<{ distanceMeters: number; speedKmh: number }> | undefined;
 
       if (planned.length > 0) {
         const details = (planned[0].details as Record<string, unknown>) || {};
@@ -58,6 +60,10 @@ export const coachService = {
         
         if (planned[0].warmup) plannedWarmup = planned[0].warmup;
         if (planned[0].cooldown) plannedCooldown = planned[0].cooldown;
+        if (planned[0].restDetails) plannedRest = planned[0].restDetails;
+        if (Array.isArray(details.intervals)) {
+          plannedIntervals = details.intervals as Array<{ distanceMeters: number; speedKmh: number }>;
+        }
         
         // --- MOTOR DE VALIDAÇÃO DE COMPLIANCE (RUA VS. ESTEIRA) ---
         let complianceStatus = 'COMPLETED_NOT_VALIDATED';
@@ -75,7 +81,12 @@ export const coachService = {
         if (stravaData.isTrainer || stravaData.hasGps === false) {
           // REGRA INDOOR: TREADMILL PROTOCOL
           const isValid = validateTreadmillIntervals(
-            { targetDistanceKm: targetDistVal, targetPace: targetPace },
+            { 
+              targetDistanceKm: targetDistVal, 
+              targetPace: targetPace,
+              restDetails: plannedRest,
+              intervals: plannedIntervals
+            },
             { distanceKm: stravaData.distanceKm, movingTimeSeconds: stravaData.movingTimeSeconds, laps: stravaData.laps }
           );
           complianceStatus = isValid ? 'VALIDATED' : 'COMPLETED_NOT_VALIDATED';

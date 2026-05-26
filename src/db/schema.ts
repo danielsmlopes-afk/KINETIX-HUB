@@ -6,6 +6,9 @@ export const athletes = pgTable('athletes', {
   stravaAccessToken: text('strava_access_token'),
   stravaRefreshToken: text('strava_refresh_token'),
   stravaExpiresAt: integer('strava_expires_at'),
+  // Âncoras geográficas para o Motor Logístico (D-1)
+  homeLat: doublePrecision('home_lat'),
+  homeLon: doublePrecision('home_lon'),
 });
 
 export const consumables = pgTable('consumables', {
@@ -60,12 +63,17 @@ export const races = pgTable('races', {
   distance: doublePrecision('distance').notNull(),
   startTime: text('start_time').notNull(),
   startLocation: text('start_location').notNull(),
+  // Coordenadas e endereço para roteamento preditivo (OSRM)
+  address: text('address'),
+  latitude: doublePrecision('latitude'),
+  longitude: doublePrecision('longitude'),
   name: text('name'),
   polyline: text('polyline'),
   movingTime: integer('moving_time'),
   weather: text('weather'),
   isTarget: boolean('is_target').default(false),
   targetPace: text('target_pace'),
+  priority: text('priority'),
 });
 
 export const workoutSessions = pgTable('workout_sessions', {
@@ -110,8 +118,10 @@ export const plannedWorkouts = pgTable('planned_workouts', {
   date: timestamp('date').notNull(),
   activityType: text('activity_type').notNull(),
   title: text('title').notNull(),
+  // Detalhamento fracionado tático e tempos de repouso
   warmup: text('warmup'),
   cooldown: text('cooldown'),
+  restDetails: text('rest_details'),
   details: jsonb('details'),
   isImported: boolean('is_imported').default(true),
   complianceStatus: text('compliance_status'), // 'VALIDATED' | 'COMPLETED_NOT_VALIDATED' | null

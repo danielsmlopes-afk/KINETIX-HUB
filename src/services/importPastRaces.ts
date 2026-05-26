@@ -63,11 +63,15 @@ async function importRaces() {
     // Salva a prova histórica no banco
     await db.insert(races).values({
       category: 'Histórico',
+      priority: 'P3', // Provas passadas entram com prioridade menor no backlog
       name: race.name,
       date: raceDate,
       distance: race.distance / 1000,
       startTime: raceDate.toISOString().substring(11, 16),
       startLocation: startLocation,
+      address: startLocation, // Usa a cidade como endereço genérico
+      latitude: race.start_latlng && race.start_latlng.length === 2 ? race.start_latlng[0] : null,
+      longitude: race.start_latlng && race.start_latlng.length === 2 ? race.start_latlng[1] : null,
       polyline: race.map?.summary_polyline || null,
       movingTime: race.moving_time,
       weather: weather

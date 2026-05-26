@@ -75,10 +75,12 @@ async function run() {
       racesToInsert.push({
         name: 'Nike SP City Marathon',
         category: 'P1',
+        priority: 'P1',
         date: dateObj,
         distance: 21.097, // Meia Maratona
-        startTime: '06:00',
+        startTime: '06:25',
         startLocation: 'São Paulo, SP',
+        address: 'Praça Charles Miller s/n, São Paulo, SP',
         isTarget: true,
         targetPace: principal.match(/Meta ([\d:]+)/)?.[1] || '06:30'
       });
@@ -90,7 +92,8 @@ async function run() {
       workoutsToInsert.push({
         athleteId: athlete.id, date: dateObj, activityType: 'RUN',
         title: atividade.split('+')[0].trim(),
-        details: { subtitle: principal, aquecimento: aq !== '-' ? aq : undefined, desaquecimento: dq !== '-' ? dq : undefined, repouso: repouso !== '-' ? repouso : undefined },
+        restDetails: repouso !== '-' ? repouso : null,
+        details: { subtitle: principal, aquecimento: aq !== '-' ? aq : undefined, desaquecimento: dq !== '-' ? dq : undefined },
         isImported: true
       });
     }

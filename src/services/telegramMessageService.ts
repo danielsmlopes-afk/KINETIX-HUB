@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eq, and, inArray, desc } from 'drizzle-orm';
+import { eq, and, inArray, desc, gte, lte } from 'drizzle-orm';
 import { db } from '@/db';
 import { pendingActions, plannedWorkouts, bioimpedanceLogs, races, workoutSessions, strengthLogs, workoutTemplateItems } from '@/db/schema';
 import { athleteRepository } from '@/repositories/athleteRepository';
@@ -15,8 +15,11 @@ const bioSchema = z.object({
 });
 
 const raceSchema = z.object({
-  name: z.string(), category: z.enum(['P1', 'P2', 'P3']), date: z.string().datetime(), distance: z.number(),
-  startTime: z.string(), startLocation: z.string(), isTarget: z.boolean().optional(), targetPace: z.string().min(4)
+  name: z.string(), category: z.enum(['P1', 'P2', 'P3']), priority: z.string().optional(),
+  date: z.string().datetime(), distance: z.number(),
+  startTime: z.string(), startLocation: z.string(), address: z.string().optional(),
+  latitude: z.number().optional(), longitude: z.number().optional(),
+  isTarget: z.boolean().optional(), targetPace: z.string().min(4)
 });
 
 async function sendMsg(chatId: number, text: string): Promise<void> {
@@ -86,7 +89,23 @@ export const telegramMessageService = {
     }
 
     if (cmd === '/BRIEFING') {
-      const briefing = await briefingService.generateDailyBriefing();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const endOfTomorrow = new Date(tomorrow);
+      endOfTomorrow.setHours(23, 59, 59, 999);
+
+      const workouts = await db.select().from(plannedWorkouts).where(
+        and(
+          eq(plannedWorkouts.athleteId, athlete.id),
+          gte(plannedWorkouts.date, tomorrow),
+          lte(plannedWorkouts.date, endOfTomorrow)
+        )
+      ).limit(1);
+
+      if (workouts.length === 0) return sendMsg(chatId, "Descanso programado para amanhã. Sem ordem de operações.");
+
+      const briefing = await briefingService.generateNightlyBriefing(workouts[0]);
       return sendMsg(chatId, briefing);
     }
 

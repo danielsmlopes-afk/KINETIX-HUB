@@ -43,21 +43,25 @@ export async function seed() {
   if (existingRaces.length === 0) {
     await db.insert(races).values([
       {
-        name: 'Nike SP 21K',
+        name: 'Nike SP City Marathon',
         category: 'P1', // Foco Principal
+        priority: 'P1',
         date: new Date('2026-07-26T06:00:00Z'),
         distance: 21.1,
-        startTime: '06:00',
+        startTime: '06:25',
         startLocation: 'São Paulo',
+        address: 'Praça Charles Miller s/n, São Paulo, SP',
         isTarget: true,
       },
       {
-        name: 'Mizuno 21K',
+        name: 'Mizuno Athenas Run Longer 2026',
         category: 'P2', // Prova futura no backlog
+        priority: 'P2',
         date: new Date('2026-10-18T06:00:00Z'),
         distance: 21.1,
         startTime: '06:30',
         startLocation: 'São Paulo',
+        address: 'Av. Henrique Chamma, 420, São Paulo, SP',
         isTarget: false,
       }
     ]);

@@ -1,6 +1,6 @@
 import { env } from '@/config/env';
 
-export async function askHeadCoach(prompt: string, contextData?: Record<string, unknown>): Promise<string> {
+export async function askHeadCoach(prompt: string, contextData?: Record<string, unknown>, customSystemInstruction?: string): Promise<string> {
   if (!env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY não configurada no .env');
   }
@@ -8,29 +8,41 @@ export async function askHeadCoach(prompt: string, contextData?: Record<string, 
   // Utilizando a API REST nativa via fetch (Diretriz Zero Google cumprida: sem SDKs pesados)
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`;
   
-  const systemInstruction = "Você é o Head Coach IA do KINETIX HUB, um treinador de alta performance esportiva (corrida, bike e força). Você é pragmático, analítico, focado em periodização e usa a ciência do esporte. Suas respostas devem ser diretas, com tom de liderança, estruturadas e sem enrolação.";
+  const systemInstruction = customSystemInstruction || "Você é o Head Coach IA do KINETIX HUB, um treinador de alta performance esportiva (corrida, bike e força). Você é pragmático, analítico, focado em periodização e usa a ciência do esporte. Suas respostas devem ser diretas, com tom de liderança, estruturadas e sem enrolação.";
   
   const fullPrompt = contextData 
     ? `[DADOS DE TELEMETRIA/TREINO DO ATLETA]:\n${JSON.stringify(contextData)}\n\n[DÚVIDA/SITUAÇÃO]: ${prompt}`
     : prompt;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: fullPrompt }] }]
-    })
-  });
+  try {
+    // Circuit Breaker: Timeout de 15 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error('❌ Erro na API do Gemini:', errorData);
-    throw new Error('Falha na comunicação com o Motor Cognitivo da IA.');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ parts: [{ text: fullPrompt }] }]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ Erro na API do Gemini:', errorData);
+      throw new Error('Falha na comunicação com o Motor Cognitivo da IA.');
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta do Coach.";
+  } catch (error) {
+    console.error('⚠️ [CIRCUIT BREAKER] Motor Cognitivo Indisponível/Lento:', error);
+    // Fallback Tático de Contingência
+    return "⚠️ *SISTEMA DE IA TEMPORARIAMENTE INDISPONÍVEL*\n\nO Motor Cognitivo está offline ou com alta latência.\n\n*Diretriz de Contingência:*\n- Mantenha a ordem de operações base.\n- Foco na constância e hidratação.\n- Opere no manual até o restabelecimento do sinal.";
   }
-
-  const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta do Coach.";
 }
 
 export interface CoachRecalculationResponse {
@@ -60,21 +72,34 @@ Você DEVE retornar EXATAMENTE um JSON válido com a seguinte estrutura:
   
   const fullPrompt = `[DADOS DE TELEMETRIA/TREINO DO ATLETA]:\n${JSON.stringify(contextData)}\n\n[SITUAÇÃO]: ${prompt}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: { responseMimeType: "application/json" } // Força a saída estrita em JSON
-    })
-  });
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  if (!response.ok) throw new Error('Falha na comunicação com a IA para recálculo.');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
 
-  const data = await response.json();
-  const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-  return JSON.parse(textResponse) as CoachRecalculationResponse;
+    if (!response.ok) throw new Error('Falha na comunicação com a IA para recálculo.');
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    return JSON.parse(textResponse) as CoachRecalculationResponse;
+  } catch (error) {
+    console.error('⚠️ [CIRCUIT BREAKER] Falha no recálculo da IA:', error);
+    return {
+      advice: "⚠️ Motor Cognitivo offline. Recálculo tático automático indisponível no momento. Siga o protocolo manual ou descanse.",
+      updates: []
+    };
+  }
 }
 
 export interface MacrocycleGenerationRequest {
@@ -121,19 +146,30 @@ Regras:
 2. Siga as orientações em [META DE RITMO (PACE)] para balizar as zonas de esforço.
 3. Considere a [COMPOSIÇÃO CORPORAL]. Se o % de gordura for alto, inclua treinos metabólicos. Se a massa muscular ou TMB indicarem risco de lesão, priorize hipertrofia e fortalecimento nos treinos de 'STRENGTH'.`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
-    })
-  });
+  try {
+    // Macrociclo é pesado, damos 25s de limite tático
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-  if (!response.ok) throw new Error('Falha na comunicação com a IA para macrociclo.');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
 
-  const data = await response.json();
-  const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-  return JSON.parse(textResponse) as MacrocycleWorkout[];
+    if (!response.ok) throw new Error('Falha na comunicação com a IA para macrociclo.');
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    return JSON.parse(textResponse) as MacrocycleWorkout[];
+  } catch (error) {
+    console.error('⚠️ [CIRCUIT BREAKER] Falha ao gerar macrociclo:', error);
+    return []; // Retorna macrociclo vazio e evita que a requisição inteira crashe
+  }
 }

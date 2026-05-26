@@ -2,7 +2,7 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { athletes, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
-import { eq, desc, gte, and, asc } from 'drizzle-orm';
+import { eq, desc, gte, lt, and, asc } from 'drizzle-orm';
 
 export const athleteController = {
   async getProfile(c: Context) {
@@ -40,7 +40,23 @@ export const athleteController = {
       const upcomingRaces = upcomingRacesDb.map(r => ({
         name: r.name || r.category,
         date: new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }),
-        distance: `${r.distance} km`
+        distance: `${r.distance} km`,
+        address: r.address,
+        startTime: r.startTime,
+        priority: r.priority,
+      }));
+
+      // 3.5 Busca Provas Históricas (Passadas)
+      const pastRacesDb = await db.select()
+        .from(races)
+        .where(lt(races.date, today))
+        .orderBy(desc(races.date)); // Mais recentes primeiro
+
+      const pastRaces = pastRacesDb.map(r => ({
+        name: r.name || r.category,
+        date: new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }),
+        distance: `${r.distance} km`,
+        movingTime: r.movingTime,
       }));
 
       // 4. Busca os Próximos Treinos Planejados do Macrociclo
@@ -96,12 +112,21 @@ export const athleteController = {
           activityType: w.activityType,
           title: w.title,
           subtitle: details.subtitle || 'Treino Estruturado',
+          restDetails: w.restDetails,
           weather: weatherStr
         };
       });
 
       // Empacota tudo para o Payload consolidado do Dashboard Mobile
-      const profile = { name: athlete.name, latestBioimpedance: latestBio, upcomingRaces, upcomingWorkouts };
+      const profile = { 
+        name: athlete.name, 
+        homeLat: athlete.homeLat,
+        homeLon: athlete.homeLon,
+        latestBioimpedance: latestBio, 
+        upcomingRaces, 
+        pastRaces,
+        upcomingWorkouts 
+      };
       return c.json({ data: profile }, 200);
     } catch (error) {
       console.error('❌ Erro ao buscar perfil do atleta:', error);

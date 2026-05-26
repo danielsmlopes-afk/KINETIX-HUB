@@ -18,15 +18,20 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 1. **Ingestão Tática (CSV/JSON)**: Carga inteligente de macrociclos estruturados no banco.
 2. **Radar de Telemetria (Strava)**: Captura de atividades via Webhook, dedução automática de Arsenal (vida útil do tênis) e Estoque (Géis).
 3. **Dashboard Mobile (Flutter)**: UI reativa integrada com telemetria corporal e alertas climáticos (OpenWeatherMap).
-4. **Briefing Diário**: Cronjob de notificação via Telegram contendo o checklist preditivo para o dia seguinte.
-5. **Ajuste Manual de Compliance**: Endpoint de Fallback permitindo validação ou invalidação manual direto pela planilha tática em casos de falha do sensor *indoor*.
+4. **Briefing Diário (22h00)**: Notificação via Telegram contendo o checklist preditivo de logística militar (Regra de Ouro do Gel) para o dia seguinte.
+5. **Motor Pré-Prova (07h00)**: Algoritmo preditivo temporal (D-3 Saturação, D-2 Pace Chart, D-1 Despertar Tático) com roteamento logístico (OSRM).
+6. **Ajuste Manual de Compliance**: Endpoint de Fallback permitindo validação ou invalidação manual direto pela planilha tática em casos de falha do sensor *indoor*.
+7. **Painel de Controle IA (Circuit Breaker)**: Interface de depuração (Debug) no App para disparar cronjobs manualmente, com fallback automático no Backend caso a API do Google Gemini sofra instabilidade.
+8. **Análise Clínica Semanal (Bioimpedância)**: Ao registrar nova medição, o sistema compara com dados de 7 dias atrás e aciona a IA para um parecer clínico de deltas (Peso, Músculo, Gordura).
+9. **Suporte a Dupla Distância (UI)**: Cards de treino no Flutter renderizam simultaneamente a distância real da planilha vs distância do painel (consolidada com repouso) para validação visual em esteira.
 
 ## ⚠️ Gestão de Dívida Técnica (Tech Debt)
-- **Dados Mockados (Frontend)**: Progressiva eliminação do uso de mock data no Flutter. Elementos residuais nas listagens do *Arsenal* e Fichas de *Laboratório* devem ser ligados 100% via Repositórios no Backend.
+- **Dados Mockados (Frontend)**: O *Arsenal* e o painel de Debug já estão consumindo dados reais. Foco total em conectar as Fichas de *Laboratório* via Repositórios no Backend.
 - **Engine de ACWR**: Refatorar o monitoramento de Carga Aguda vs. Crônica para refletir as punições e compensações das rotas `COMPLETED_NOT_VALIDATED`.
 
 ## 🚀 Próximos Passos
-- Finalizar a injeção/cruzamento da tabela do **Laboratório (Fichas de Força / IronLog)**.
+- Implementar o gatilho automático no Webhook do Strava para notificar quando a **vida útil de um tênis atingir o teto de 800km**.
+- Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
 - Implementação visual nativa para a janela de Inclusão de Provas (Race Input).
 - Painel de download automático dos Dossiês em formato PDF.
 
@@ -44,9 +49,10 @@ kinetix-api/
 │   ├── controllers/   # Regras de roteamento e extração de payload (ex: coachController)
 │   ├── db/            # Conexão Drizzle ORM, schema (schema.ts) e migrações
 │   ├── repositories/  # Acesso abstrato a dados / queries isoladas (ex: stravaRepository)
-│   ├── routes/        # Declaração das rotas Hono (api.ts, coachRoutes.ts)
+│   ├── routes/        # Declaração das rotas Hono (api.ts, coachRoutes.ts, debugRoutes.ts)
 │   ├── scripts/       # Scripts autônomos de manipulação (ex: updateWarmups.ts)
-│   └── services/      # Coração das regras de negócio, APIs externas e IAs
+│   │   └── seedBioimpedance.ts # Ingestor clínico (Parser CSV OKOK)
+│   └── services/      # Coração das regras de negócio, APIs externas, Cronjobs e IAs
 ├── .env               # (Ignorado no Git) Variáveis locais
 └── package.json
 ```
@@ -61,6 +67,7 @@ kinetix_app/
 │   └── features/      # Clean Architecture: Isolamento por Domínio
 │       ├── arsenal/     # Tênis e vida útil
 │       ├── dashboard/   # Hub Central (Hoje, Amanhã, Bioimpedância)
+│       │   └── widgets/ # Componentização SOLID (bioimpedance_card, upcoming_races_card, upcoming_workouts_card, etc.)
 │       ├── dossiers/    # Relatórios em PDF
 │       ├── laboratory/  # Fichas de força
 │       └── spreadsheet/ # Planilha tática
@@ -70,10 +77,15 @@ kinetix_app/
 ## 🧠 CAPÍTULO 2: Dicionário de Arquivos Principais (Core Files)
 
 - **`[coachService.ts]`** (`kinetix-api/src/services/coachService.ts`): Cérebro do sistema de auditoria. Analisa os webhooks do Strava cruzando com a planilha para determinar compliance de *volume*, *intensidade*, rua e esteira.
-- **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Cuida de requisições abstratas como recálculo de rotas e criação de macrociclos inteiros para provas alvo.
+- **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Inclui proteção de *Circuit Breaker* e respostas de contingência para evitar gargalos na API do Google.
 - **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava e repassa Laps e Flags para validação.
-- **`[treadmillProtocol.ts]`** (`kinetix-api/src/services/treadmillProtocol.ts`): Isolamento matemático para validação estrita de atividades indoor (Ignora o GPS e reconstrói parciais via Moving Time).
+- **`[treadmillProtocol.ts]`** (`kinetix-api/src/services/treadmillProtocol.ts`): Isolamento matemático para validação estrita de atividades indoor (Ignora o GPS, reconstrói parciais via Moving Time e calcula margens dinâmicas de repouso passivo).
+- **`[briefingService.ts]`** (`kinetix-api/src/services/briefingService.ts`): Orquestrador do Briefing Diário Noturno. Aplica as regras de ouro logísticas (Gel vs Hidratação) montando o payload em MarkdownV2 rígido.
+- **`[morningRaceService.ts]`** (`kinetix-api/src/services/morningRaceService.ts`): Motor Pré-Prova Matinal. Executa os protocolos de contingência D-3 (Saturação de Glicogênio), D-2 (Pace Chart e Géis) e D-1 (Checklist de Véspera).
+- **`[cronJobs.ts]`** (`kinetix-api/src/services/cronJobs.ts`): Relógio Mestre do sistema, responsável por inicializar as varreduras diárias com auxílio da Inteligência Artificial.
 - **`[schema.ts]`** (`kinetix-api/src/db/schema.ts`): A espinha dorsal dos dados. Onde todas as tabelas em PostgreSQL são definidas.
+- **`[telegramController.ts]`** (`kinetix-api/src/controllers/telegramController.ts`): Orquestra as tendências de bioimpedância calculando deltas semanais e interagindo com a IA para emitir Alertas Vermelhos de nutrição.
+- **`[debugRoutes.ts]`** (`kinetix-api/src/routes/debugRoutes.ts`): Endpoints de injeção manual permitindo que o Comandante dispare varreduras temporais no frontend fora da janela agendada.
 - **`[api_client.dart]`** (`kinetix_app/lib/core/network/api_client.dart`): Wrapper de rede que lida com os tokens de autenticação (Firebase) e se comunica com o Hono.
 - **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia.
 
@@ -99,7 +111,7 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 
 ### 1. `athletes`
 - **Função:** Identidade primária.
-- **Colunas:** `id` (UUID, PK), `name` (Text), `stravaAccessToken`, `stravaRefreshToken`, `stravaExpiresAt` (Int).
+- **Colunas:** `id` (UUID, PK), `name` (Text), `stravaAccessToken`, `stravaRefreshToken`, `stravaExpiresAt` (Int), `homeLat`, `homeLon`.
 
 ### 2. `planned_workouts` (A Planilha Tática)
 - **Função:** Alvos semanais traçados pelo Coach.
@@ -110,6 +122,7 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
   - `title` (Text), `details` (JSONB)
   - **`warmup`** (Text): Protocolo de aquecimento (ex: '10min trote leve').
   - **`cooldown`** (Text): Protocolo de desaquecimento (ex: '5min soltura').
+  - **`restDetails`** (Text): Tempo e tipo de repouso para treinos intervalados, agora renderizado na Planilha do App.
   - **`complianceStatus`** (Text): Recebe o atestado do motor: `VALIDATED`, `COMPLETED_NOT_VALIDATED` ou `MISSED`.
 
 ### 3. `workout_sessions` & `treadmill_intervals` (As Execuções)
@@ -117,8 +130,8 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 - **Colunas Principais:** `id` (UUID), `durationMinutes` (Int), `distance` (Float), `warmup` e `cooldown` (Text). `treadmill_intervals` guarda parciais com FK para `sessionId`.
 
 ### 4. `races` (Provas Alvo)
-- **Função:** Provas P1/P2 registradas pelo atleta.
-- **Colunas Principais:** `id` (UUID), `category` (Text), `date` (Timestamp), `distance` (Float), `startLocation`, `movingTime`, `weather`, `polyline` (GPS trace).
+- **Função:** Provas P1/P2/P3 registradas pelo atleta e orquestradas pela IA.
+- **Colunas Principais:** `id` (UUID), `category`, `priority`, `date` (Timestamp), `startTime` (Text), `distance` (Float), `address` (Usado para OSRM Engine), `latitude`, `longitude`, `movingTime`, `weather`, `polyline` (GPS trace).
 
 ### 5. `bioimpedance_logs` (Saúde/Laboratório)
 - **Função:** Adaptação metabólica e métricas do peso.
@@ -132,3 +145,30 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 ### 7. Tabelas de Filas Táticas
 - **`cron_logs`**: Guarda o resultado de execuções de rotinas (Briefing).
 - **`pending_actions`**: Eventos não processados exigindo tomada de decisão do usuário ou Head Coach.
+
+---
+
+## ⏱️ CAPÍTULO 5: Cronjobs e Automações (Agendamentos)
+
+A engrenagem autônoma do KINETIX HUB funciona com base em intervalos cirúrgicos para orquestrar os protocolos militares:
+
+1. **`07:00` (Morning Race Job)**: O sistema analisa o calendário de provas (`races`). Dispara os protocolos táticos D-3 (Saturação de Glicogênio e Clima), D-2 (Arsenal de Géis e Pace Chart) e D-1 (Logística de Combate, Cálculo do Despertar Tático OSRM e Waze).
+2. **`22:00` (Daily Briefing Job)**: Analisa o treino planejado (`plannedWorkouts`) para o dia seguinte e envia o resumo tático, PoP (Probabilidade de Chuva OpenWeatherMap), Arsenal Logístico e Visão do Macrociclo ao Comandante no Telegram.
+3. **`23:30` (Route Recalculation Job)**: Auditoria final do dia (Compliance). Verifica se havia um treino programado para hoje e se ele de fato aconteceu (via telemetria do Strava). Se houver quebra (MISSED), a IA é engatilhada para analisar toda a semana do atleta e propor um Recálculo da Rota ou Cancelamento do evento.
+
+*NOTA: Todos os cronjobs podem ser forçados instantaneamente pela ABA DE EQUIPAMENTOS no aplicativo Mobile através do Painel de Controle IA.*
+
+---
+
+## 🛡️ CAPÍTULO 6: Validação de Schema (Telemetria e Provas)
+
+O banco de dados foi preparado e parametrizado para suportar o motor cognitivo:
+- **`races`**: Possui a exclusividade sobre os alvos, englobando colunas logísticas vitais como `address`, `startTime`, `priority`, `latitude` e `longitude`. Responsável direto pelo acionamento do motor OSRM e Despertar Tático.
+- **`planned_workouts`**: Detém o detalhamento fracionado de treino (suportando texto rico e metadados) nas colunas `warmup`, `cooldown` e `restDetails` para alimentar a planilha no Flutter e as auditorias.
+- **`athletes`**: Inclui `homeLat` e `homeLon` mapeadas em dupla precisão flutuante para assegurar cálculos de geolocalização.
+
+---
+
+## 🛠️ CAPÍTULO 7: Scripts Utilitários e Operações Táticas
+
+- **`seedBioimpedance.ts`**: Ferramenta de linha de comando (`src/scripts`) para fazer o parse e a ingestão do histórico clínico do atleta. O script é desenhado para ignorar metadados irregulares das exportações da app OKOK e injetar as leituras em massa de forma segura na tabela `bioimpedance_logs`.

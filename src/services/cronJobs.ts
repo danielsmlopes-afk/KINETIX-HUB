@@ -1,11 +1,12 @@
 import cron from 'node-cron';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { db } from '@/db';
-import { plannedWorkouts, cronLogs, workoutSessions, pendingActions } from '@/db/schema';
+import { plannedWorkouts, cronLogs, workoutSessions, pendingActions, races } from '@/db/schema';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { briefingService } from './briefingService';
 import { env } from '@/config/env';
 import { askHeadCoach, askHeadCoachForRecalculation } from './headCoachService';
+import { morningRaceService } from './morningRaceService';
 
 export async function runDailyBriefingJob() {
   let status = 'SUCCESS';
@@ -14,7 +15,29 @@ export async function runDailyBriefingJob() {
   try {
     console.log('⏳ Iniciando Cron: Verificação de treino para o Briefing Diário...');
     
-    const briefing = await briefingService.generateDailyBriefing();
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const endOfTomorrow = new Date(tomorrow);
+    endOfTomorrow.setHours(23, 59, 59, 999);
+
+    const workouts = await db.select().from(plannedWorkouts).where(
+      and(
+        eq(plannedWorkouts.athleteId, athlete.id),
+        gte(plannedWorkouts.date, tomorrow),
+        lte(plannedWorkouts.date, endOfTomorrow)
+      )
+    ).limit(1);
+
+    if (workouts.length === 0) {
+      console.log('✅ Cron: Sem treino planejado para amanhã. Briefing pulado.');
+      return;
+    }
+
+    const briefing = await briefingService.generateNightlyBriefing(workouts[0]);
     
     const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
     const telegramResponse = await fetch(url, {
@@ -151,7 +174,60 @@ export async function runRouteRecalculationJob() {
   }
 }
 
+export async function runMorningRaceJob() {
+  let status = 'SUCCESS';
+  let logMessage = 'Rotina matinal pré-prova executada com sucesso.';
+
+  try {
+    console.log('⏳ Iniciando Cron: Morning Race Service (D-3, D-2, D-1)...');
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const next3Days = new Date(today);
+    next3Days.setDate(next3Days.getDate() + 4);
+
+    const upcomingRaces = await db.select().from(races).where(
+      and(gte(races.date, today), lte(races.date, next3Days))
+    );
+
+    for (const race of upcomingRaces) {
+      const rDate = new Date(race.date);
+      rDate.setHours(0, 0, 0, 0);
+
+      const diffTime = rDate.getTime() - today.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      let message = '';
+      if (diffDays === 3) message = await morningRaceService.processD3(athlete.id, race);
+      else if (diffDays === 2) message = await morningRaceService.processD2(race);
+      else if (diffDays === 1) message = await morningRaceService.processD1(athlete, race);
+
+      if (message) {
+        const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const telegramResponse = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: message, parse_mode: 'MarkdownV2' }) });
+        if (!telegramResponse.ok) {
+          console.warn('⚠️ Telegram rejeitou a formatação MarkdownV2 da IA. Enviando como texto puro...');
+          await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: message }) });
+        }
+      }
+    }
+    console.log('✅ Cron: Morning Race Service finalizado.');
+  } catch (error) {
+    status = 'ERROR';
+    logMessage = error instanceof Error ? error.message : 'Erro no Morning Race Service';
+    console.error('❌ Erro no Cron Morning Race:', error);
+  } finally {
+    try { await db.insert(cronLogs).values({ jobName: 'Morning Race Job', status, message: logMessage }); } catch (e) {}
+  }
+}
+
 export function startCronJobs() {
+  // Rotina Matinal (D-3, D-2, D-1 da Prova): Todos os dias às 07:00
+  cron.schedule('0 7 * * *', runMorningRaceJob);
+
   // Disparo diário às 22h00
   cron.schedule('0 22 * * *', runDailyBriefingJob);
 
