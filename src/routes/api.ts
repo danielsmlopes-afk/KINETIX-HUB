@@ -25,6 +25,7 @@ apiRoutes.route('/', webhookRoutes);
 // 2. ROTAS PRIVADAS DO APP (Requerem Firebase Auth)
 const privateAppRoutes = new Hono();
 privateAppRoutes.use('*', firebaseAuthMiddleware);
+
 privateAppRoutes.get('/athlete/profile', athleteController.getProfile);
 privateAppRoutes.get('/athlete/dossier', dossierController.getDossier);
 privateAppRoutes.route('/reports', reportRoutes);

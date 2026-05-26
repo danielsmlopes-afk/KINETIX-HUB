@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { workoutTemplates, workoutTemplateItems, exerciseLibrary } from '@/db/schema';
+import { workoutTemplates, workoutTemplateItems, exerciseLibrary, workoutSessions, strengthLogs } from '@/db/schema';
 
 export const strengthRepository = {
   async getWorkoutTemplate(name: string) {
@@ -87,6 +87,33 @@ export const strengthRepository = {
         const newItems = items.map(item => ({ templateId, exerciseId: item.exerciseId, sets: item.sets, reps: item.reps, notes: item.notes || null }));
         await tx.insert(workoutTemplateItems).values(newItems);
       }
+    });
+  },
+
+  async saveStrengthLog(
+    athleteId: string, 
+    durationMinutes: number, 
+    logs: Array<{ exerciseId: string; actualSets: number; actualReps: string; weightUsed: number; notes?: string }>
+  ) {
+    return await db.transaction(async (tx) => {
+      const [session] = await tx.insert(workoutSessions).values({
+        athleteId,
+        date: new Date(),
+        durationMinutes
+      }).returning();
+
+      if (logs.length > 0) {
+        const logsToInsert = logs.map(log => ({
+          sessionId: session.id,
+          exerciseId: log.exerciseId,
+          actualSets: log.actualSets,
+          actualReps: log.actualReps,
+          weightUsed: log.weightUsed,
+          notes: log.notes || null
+        }));
+        await tx.insert(strengthLogs).values(logsToInsert);
+      }
+      return session;
     });
   }
 };

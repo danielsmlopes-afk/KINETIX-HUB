@@ -32,7 +32,6 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 ## 🚀 Próximos Passos
 - Implementar o gatilho automático no Webhook do Strava para notificar quando a **vida útil de um tênis atingir o teto de 800km**.
 - Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
-- Implementação visual nativa para a janela de Inclusão de Provas (Race Input).
 - Painel de download automático dos Dossiês em formato PDF.
 
 ---
@@ -67,7 +66,7 @@ kinetix_app/
 │   └── features/      # Clean Architecture: Isolamento por Domínio
 │       ├── arsenal/     # Tênis e vida útil
 │       ├── dashboard/   # Hub Central (Hoje, Amanhã, Bioimpedância)
-│       │   └── widgets/ # Componentização SOLID (bioimpedance_card, upcoming_races_card, upcoming_workouts_card, etc.)
+│       │   └── widgets/ # Componentização SOLID (Cards isolados sem dependência do objeto global profile, recebendo Listas diretas).
 │       ├── dossiers/    # Relatórios em PDF
 │       ├── laboratory/  # Fichas de força
 │       └── spreadsheet/ # Planilha tática
@@ -77,6 +76,7 @@ kinetix_app/
 ## 🧠 CAPÍTULO 2: Dicionário de Arquivos Principais (Core Files)
 
 - **`[coachService.ts]`** (`kinetix-api/src/services/coachService.ts`): Cérebro do sistema de auditoria. Analisa os webhooks do Strava cruzando com a planilha para determinar compliance de *volume*, *intensidade*, rua e esteira.
+- **`[strengthRepository.ts]`** (`kinetix-api/src/repositories/strengthRepository.ts`): Gerencia a persistência das Fichas de Treino e Auditoria (IronLog), isolando lógicas de JOIN entre templates, exercícios e os registros efetivamente realizados na sessão.
 - **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Inclui proteção de *Circuit Breaker* e respostas de contingência para evitar gargalos na API do Google.
 - **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava e repassa Laps e Flags para validação.
 - **`[treadmillProtocol.ts]`** (`kinetix-api/src/services/treadmillProtocol.ts`): Isolamento matemático para validação estrita de atividades indoor (Ignora o GPS, reconstrói parciais via Moving Time e calcula margens dinâmicas de repouso passivo).
@@ -88,6 +88,16 @@ kinetix_app/
 - **`[debugRoutes.ts]`** (`kinetix-api/src/routes/debugRoutes.ts`): Endpoints de injeção manual permitindo que o Comandante dispare varreduras temporais no frontend fora da janela agendada.
 - **`[api_client.dart]`** (`kinetix_app/lib/core/network/api_client.dart`): Wrapper de rede que lida com os tokens de autenticação (Firebase) e se comunica com o Hono.
 - **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia.
+- **`[upcoming_races_card.dart]` / `[upcoming_workouts_card.dart]`**: Componentes Flutter operando de forma isolada, recebendo diretamente as matrizes de dados (`races` e `workouts`), desvinculando-se estritamente da dependência do objeto de `profile`.
+
+## 🏋️ CAPÍTULO 8: Endpoints de Força (IronLog)
+
+O módulo do Laboratório expõe rotas restritas para a renderização do IronLog no Frontend Flutter:
+
+- **`GET /api/strength/templates`**: Retorna a relação completa das fichas de treino com o detalhamento de exercícios, séries e repetições (Faz o JOIN de `workout_templates`, `workout_template_items` e `exercise_library`).
+- **`GET /api/strength/templates/:id/exercises`**: Retorna cirurgicamente os exercícios de uma ficha em particular.
+- **`POST /api/strength/log`**: Registra uma nova sessão no Laboratório. Injeta o cabeçalho base em `workout_sessions` e o detalhamento executado de carga e repetição em `strength_logs`.
+- **`GET /api/strength/log/:sessionId/audit`**: Retorna o espelho comparativo da auditoria tática (Planilha Base vs Execução Real).
 
 ## 🔐 CAPÍTULO 3: Variáveis de Ambiente (.env Schema)
 

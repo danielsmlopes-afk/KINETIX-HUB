@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { apiRoutes } from './routes/api'; // Puxa as suas rotas geradas
 import { debugRoutes } from './routes/debugRoutes';
+import { strengthRoutes } from './routes/strengthRoutes';
 import { startCronJobs } from './services/cronJobs';
 
 const app = new Hono();
@@ -42,6 +43,7 @@ app.get('/api/healthz', (c) => {
 // Montagem das rotas da API
 app.route('/api', apiRoutes);
 app.route('/api/debug', debugRoutes);
+app.route('/api/strength', strengthRoutes);
 
 // Configuração da porta
 const port = Number(process.env.PORT) || 3000;

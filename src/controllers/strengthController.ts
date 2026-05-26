@@ -6,6 +6,14 @@ import { workoutSessions, strengthLogs, workoutTemplateItems, exerciseLibrary } 
 import { env } from '@/config/env';
 import { eq, and } from 'drizzle-orm';
 
+interface StrengthLogPayload {
+  exerciseId: string;
+  actualSets: number;
+  actualReps: string;
+  weightUsed: number;
+  notes?: string;
+}
+
 export const strengthController = {
   async listTemplates(c: Context) {
     try {
@@ -49,34 +57,19 @@ export const strengthController = {
   async logWorkout(c: Context) {
     try {
       const body = await c.req.json().catch(() => ({}));
-      const { templateName = 'Treino de Força', durationMinutes = 60, exercises = [], logs = [] } = body;
+      const templateName = String(body.templateName || 'Treino de Força');
+      const durationMinutes = Number(body.durationMinutes || 60);
 
       // Faz a ponte inteligente caso os dados venham do App Flutter (logs) ou de outro lugar (exercises)
-      const itemsToLog = logs.length > 0 ? logs : exercises;
+      const itemsToLog = (Array.isArray(body.logs) && body.logs.length > 0 ? body.logs : (body.exercises || [])) as StrengthLogPayload[];
 
       const athlete = await athleteRepository.getPrimaryAthlete();
       if (!athlete) {
         return c.json({ error: "Atleta não encontrado.", code: "ATHLETE_NOT_FOUND" }, 404);
       }
 
-      const [session] = await db.insert(workoutSessions).values({
-        athleteId: athlete.id,
-        date: new Date(),
-        durationMinutes
-      }).returning();
-
-      // Gravar o array de exercícios realizados
-      if (Array.isArray(itemsToLog) && itemsToLog.length > 0) {
-        const logsToInsert = itemsToLog.map((ex: any) => ({
-          sessionId: session.id,
-          exerciseId: ex.exerciseId,
-          actualSets: ex.actualSets,
-          actualReps: ex.actualReps,
-          weightUsed: ex.weightUsed,
-          notes: ex.notes
-        }));
-        await db.insert(strengthLogs).values(logsToInsert);
-      }
+      // Delegação para o Repositório persistir a sessão e os logs
+      const session = await strengthRepository.saveStrengthLog(athlete.id, durationMinutes, itemsToLog);
 
       // Notificação de Sucesso via Telegram Bot
       const telegramMessage = `💪 *Excelente, Comandante!*\n\nO *${templateName}* foi concluído e registado com sucesso (${durationMinutes} min).\n\nContinue executando a missão.`;
