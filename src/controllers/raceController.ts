@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { races } from '@/db/schema';
+import { macrocycleService } from '@/services/macrocycleService';
 
 export const raceController = {
   async addRace(c: Context) {
@@ -18,11 +19,22 @@ export const raceController = {
         isTarget: body.category === 'P1',
       }).returning();
 
+      // Gatilho do Motor Cognitivo Assíncrono para Todas as Provas (Periodização Dinâmica)
+      setTimeout(() => {
+        macrocycleService.generateMacrocycle(
+          body.name || 'Prova', 
+          Number(body.distance), 
+          new Date(body.date),
+          body.category || 'P3',
+          inserted[0].id
+        ).catch(console.error);
+      }, 0);
+
       return c.json({ 
         data: { 
           message: 'Prova registrada com sucesso!',
           race: inserted[0],
-          requiresMacrocycle: body.category === 'P1'
+          requiresMacrocycle: true
         } 
       }, 201);
     } catch (error) {

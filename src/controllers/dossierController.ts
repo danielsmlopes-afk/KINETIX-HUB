@@ -41,5 +41,18 @@ export const dossierController = {
       console.error('❌ Erro no Dossiê:', error);
       return c.json({ error: 'Erro interno ao gerar dossiê.', code: 'INTERNAL_ERROR' }, 500);
     }
+  },
+
+  async listDossiers(c: Context) {
+    try {
+      // Matriz de PDFs executivos na Cloud/Storage
+      const dossiers = [
+        { id: 1, title: 'Planilha Definitiva Nike SP', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', date: '2026-05-01' },
+        { id: 2, title: 'Laudo Clínico (Bioimpedância)', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', date: '2026-05-15' }
+      ];
+      return c.json({ data: dossiers }, 200);
+    } catch (error) {
+      return c.json({ error: 'Erro ao listar dossiês.', code: 'INTERNAL_ERROR' }, 500);
+    }
   }
 };

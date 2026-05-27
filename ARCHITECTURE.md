@@ -24,6 +24,7 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 7. **Painel de Controle IA (Circuit Breaker)**: Interface de depuração (Debug) no App para disparar cronjobs manualmente, com fallback automático no Backend caso a API do Google Gemini sofra instabilidade.
 8. **Análise Clínica Semanal (Bioimpedância)**: Ao registrar nova medição, o sistema compara com dados de 7 dias atrás e aciona a IA para um parecer clínico de deltas (Peso, Músculo, Gordura).
 9. **Suporte a Dupla Distância (UI)**: Cards de treino no Flutter renderizam simultaneamente a distância real da planilha vs distância do painel (consolidada com repouso) para validação visual em esteira.
+10. **Algoritmo de Periodização Dinâmica (IA)**: A geração de macrociclos no Motor Hono é adaptável. O Head Coach calcula as semanas disponíveis até qualquer prova (P1/P2/P3), aplica Compressão de Semanas na Fase de Base se necessário, insere Janelas de Teste para P2 e ignora Tapering para P3.
 
 ## ⚠️ Gestão de Dívida Técnica (Tech Debt)
 - **Dados Mockados (Frontend)**: O *Arsenal* e o painel de Debug já estão consumindo dados reais. Foco total em conectar as Fichas de *Laboratório* via Repositórios no Backend.
@@ -32,7 +33,7 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 ## 🚀 Próximos Passos
 - Implementar o gatilho automático no Webhook do Strava para notificar quando a **vida útil de um tênis atingir o teto de 800km**.
 - Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
-- Painel de download automático dos Dossiês em formato PDF.
+- Aprimorar relatórios visuais estendendo as lógicas do motor nativo de PDF.
 
 ---
 
@@ -66,8 +67,9 @@ kinetix_app/
 │   └── features/      # Clean Architecture: Isolamento por Domínio
 │       ├── arsenal/     # Tênis e vida útil
 │       ├── dashboard/   # Hub Central (Hoje, Amanhã, Bioimpedância)
-│       │   └── widgets/ # Componentização SOLID (Cards isolados sem dependência do objeto global profile, recebendo Listas diretas).
+│       │   └── widgets/ # Componentização SOLID (UpcomingWorkoutsCard com ExpansionTile híbrido para Aquecimento/Desaquecimento).
 │       ├── dossiers/    # Relatórios em PDF
+│       │   ├── dossier_panel.dart    # Painel executivo que utiliza url_launcher para downloads de PDF.
 │       ├── laboratory/  # Fichas de força
 │       └── spreadsheet/ # Planilha tática
 └── pubspec.yaml
@@ -76,6 +78,7 @@ kinetix_app/
 ## 🧠 CAPÍTULO 2: Dicionário de Arquivos Principais (Core Files)
 
 - **`[coachService.ts]`** (`kinetix-api/src/services/coachService.ts`): Cérebro do sistema de auditoria. Analisa os webhooks do Strava cruzando com a planilha para determinar compliance de *volume*, *intensidade*, rua e esteira.
+- **`[macrocycleService.ts]`** (`kinetix-api/src/services/macrocycleService.ts`): Serviço autônomo que intercepta cadastros de provas e gera via Head Coach IA a estrutura tática de um macrociclo dinâmico adaptado às semanas restantes e prioridade (P1/P2/P3), com notificações ao Telegram.
 - **`[strengthRepository.ts]`** (`kinetix-api/src/repositories/strengthRepository.ts`): Gerencia a persistência das Fichas de Treino e Auditoria (IronLog), isolando lógicas de JOIN entre templates, exercícios e os registros efetivamente realizados na sessão.
 - **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Inclui proteção de *Circuit Breaker* e respostas de contingência para evitar gargalos na API do Google.
 - **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava e repassa Laps e Flags para validação.
@@ -88,7 +91,10 @@ kinetix_app/
 - **`[debugRoutes.ts]`** (`kinetix-api/src/routes/debugRoutes.ts`): Endpoints de injeção manual permitindo que o Comandante dispare varreduras temporais no frontend fora da janela agendada.
 - **`[api_client.dart]`** (`kinetix_app/lib/core/network/api_client.dart`): Wrapper de rede que lida com os tokens de autenticação (Firebase) e se comunica com o Hono.
 - **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia.
-- **`[upcoming_races_card.dart]` / `[upcoming_workouts_card.dart]`**: Componentes Flutter operando de forma isolada, recebendo diretamente as matrizes de dados (`races` e `workouts`), desvinculando-se estritamente da dependência do objeto de `profile`.
+- **`[upcoming_races_card.dart]` / `[upcoming_workouts_card.dart]`**: Componentes Flutter operando de forma isolada. O `UpcomingWorkoutsCard` utiliza o `ExpansionTile` para *Glanceability* da Série Principal no estado colapsado, ocultando detalhes periféricos (Aquecimento, Desaquecimento, Repouso) sob demanda na expansão.
+- **`[lab_screen.dart]`** (`kinetix_app/lib/features/laboratory/lab_screen.dart`): Tela principal do Laboratório. Consome a rota `/api/strength/templates` para listar as fichas de treino (A, B, C) disponíveis para o atleta.
+- **`[iron_log_screen.dart]`** (`kinetix_app/lib/features/laboratory/iron_log_screen.dart`): Interface de registro do treino de força (IronLog). Ao receber uma ficha, busca seus exercícios e permite que o atleta insira a carga (kg) e repetições realizadas, persistindo a sessão via `POST /api/strength/log`.
+- **`[reports_screen.dart]`** (`kinetix_app/lib/features/dossiers/reports_screen.dart`): Tela que exibe e possibilita o download assíncrono em array de bytes dos relatórios PDF gerados nativamente pelo motor vetorial Hono.
 
 ## 🏋️ CAPÍTULO 8: Endpoints de Força (IronLog)
 
@@ -114,6 +120,10 @@ As chaves de sistema garantem a segurança e conectividade do motor. **Nunca ins
 - **`TELEGRAM_CHAT_ID`**: ID do canal/grupo focado entre o Atleta e o Sistema.
 - **`OPENWEATHER_API_KEY`**: Chave de telemetria climática (Pacing/Temperatura).
 - **`FIREBASE_PROJECT_ID`**: Variável do Middleware de Autenticação (App <-> Hono).
+
+> **🚨 ALERTA DE SEGURANÇA (AUDIENCE MISMATCH):**
+> O `FIREBASE_PROJECT_ID` do Backend (e sua respectiva *Service Account JSON*) **DEVE ser estritamente igual** ao `projectId` configurado no Frontend (`lib/firebase_options.dart`). 
+> Divergências entre projetos (ex: App a gerar JWT em `kinetix-hub` e Hono a validar em `danielprocoach`) causarão o erro bloqueante de `incorrect "aud" (audience) claim` e a API retornará 401 Unauthorized.
 
 ## 🗄️ CAPÍTULO 4: Schema do Banco de Dados (Drizzle ORM)
 

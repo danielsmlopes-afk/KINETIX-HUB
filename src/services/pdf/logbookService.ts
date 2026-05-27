@@ -1,77 +1,65 @@
 import PDFDocument from 'pdfkit';
+import { Buffer } from 'buffer';
 
-export function generateLogbookPdf(cycleId: string): Promise<Buffer> {
+export async function generateLogbookPdf(cycleId: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      // Inicialização do Documento (Tamanho A4, margens limpas de 50pt)
-      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const doc = new PDFDocument({ margin: 50 });
       const buffers: Buffer[] = [];
 
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', () => {
-        resolve(Buffer.concat(buffers));
+      doc.on('data', (chunk) => buffers.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+
+      // 1. Capa "Boarding Pass"
+      doc.rect(50, 50, 512, 100).fill('#2c3e50');
+      doc.fillColor('#1abc9c').fontSize(24).text('DIÁRIO DE VIAGEM (LOGBOOK)', 70, 75);
+      doc.fillColor('#ecf0f1').fontSize(12).text(`Ciclo Tático: ${cycleId} | ACWR Topography`, 70, 110);
+
+      // 2. Gráfico ACWR (Topografia Vetorial)
+      const startX = 50;
+      const chartWidth = 512;
+      const chartY = 250;
+      const chartHeight = 200;
+      const chartBottom = chartY + chartHeight;
+
+      // Mock Array de 16 semanas (Agudo vs Crônico)
+      const acwrData = [0.8, 0.9, 1.1, 1.3, 1.0, 0.8, 0.7, 1.2, 1.6, 1.4, 1.1, 0.9, 1.0, 1.2, 1.3, 1.1];
+      const maxAcwr = 2.0; // Teto do eixo Y
+      const stepX = chartWidth / (acwrData.length - 1);
+
+      // Cálculo Cartesiano dos pontos (X, Y)
+      const points = acwrData.map((val, index) => {
+        const x = startX + index * stepX;
+        // Normalização: Eixo Y inverte visualmente (Cresce para baixo no PDFKit)
+        const y = chartBottom - (val / maxAcwr) * chartHeight;
+        return { x, y };
       });
 
-      // --- PÁGINA 1: BOARDING PASS (CAPA VETORIAL) ---
-      // Retângulo Cinza de Fundo com contorno
-      doc.rect(50, 50, 495, 200).fillAndStroke('#f4f4f4', '#cccccc');
-      doc.fill('#333333');
-      doc.fontSize(24).text('KINETIX HUB - BOARDING PASS', 70, 70);
-      doc.fontSize(14).text(`DESTINO: Nike SP 21K (Prova P1 Alvo)`, 70, 115);
-      doc.text(`CICLO ID: ${cycleId}`, 70, 140);
-      doc.text(`PACE DE VOO ALVO: 5:00 min/km`, 70, 165);
-      doc.text(`STATUS DE DECOLAGEM: AUTORIZADO`, 70, 190);
+      // Desenho da Área de Preenchimento Base (Fill)
+      doc.moveTo(points[0].x, chartBottom);
+      points.forEach(p => doc.lineTo(p.x, p.y));
+      doc.lineTo(points[points.length - 1].x, chartBottom);
+      doc.fillOpacity(0.2).fill('#1abc9c');
 
-      // --- PÁGINA 2: GRÁFICO VETORIAL ACWR ---
-      doc.addPage();
-      doc.fontSize(18).text('Topografia do Treinamento (ACWR)', 50, 50);
-      
-      // Mock de 16 semanas de treinamento
-      const acwrData = [0.8, 0.9, 1.1, 1.3, 1.4, 1.6, 1.2, 1.0, 1.1, 1.4, 1.7, 1.3, 1.1, 0.9, 0.8, 1.0];
-      const startX = 50, startY = 110, chartW = 495, chartH = 200;
-      const maxAcwr = 2.0;
-      const stepX = chartW / (acwrData.length - 1);
+      // Linha Principal de Topografia (Stroke)
+      doc.fillOpacity(1);
+      doc.moveTo(points[0].x, points[0].y);
+      points.forEach(p => doc.lineTo(p.x, p.y));
+      doc.lineWidth(3).stroke('#1abc9c');
 
-      // Eixos Cartesianos (X e Y)
-      doc.moveTo(startX, startY).lineTo(startX, startY + chartH).lineTo(startX + chartW, startY + chartH).stroke('#999999');
+      // Zona de Perigo de Lesão (Linha de Corte ACWR = 1.5)
+      const dangerY = chartBottom - (1.5 / maxAcwr) * chartHeight;
+      doc.moveTo(startX, dangerY).lineTo(startX + chartWidth, dangerY).lineWidth(1).dash(5, { space: 5 }).stroke('#e74c3c').undash();
+      doc.fillColor('#e74c3c').fontSize(10).text('Zona de Perigo (ACWR 1.5)', startX + 5, dangerY - 15);
 
-      // Polígono da Área Preenchida (Cinza Claro)
-      doc.moveTo(startX, startY + chartH);
-      acwrData.forEach((val, i) => doc.lineTo(startX + i * stepX, startY + chartH - (val / maxAcwr) * chartH));
-      doc.lineTo(startX + chartW, startY + chartH).fill('#e8e8e8');
+      // 3. Retângulos Inferiores (Milestones & Logística)
+      doc.rect(50, 480, 246, 80).fill('#34495e');
+      doc.fillColor('#ecf0f1').fontSize(14).text('Auditoria de Arsenal', 65, 495);
+      doc.fontSize(10).fillColor('#95a5a6').text('Tênis Alvo: UA HOVR Sonic (340/800km)\nStatus: Operacional', 65, 520);
 
-      // Linha Contínua da Carga (Traço Escuro)
-      let isFirst = true;
-      acwrData.forEach((val, i) => {
-        const x = startX + i * stepX, y = startY + chartH - (val / maxAcwr) * chartH;
-        if (isFirst) { doc.moveTo(x, y); isFirst = false; } else doc.lineTo(x, y);
-      });
-      doc.stroke('#333333');
-
-      // Limite Crítico: Zona de Perigo Tracejada (ACWR = 1.5)
-      const dangerY = startY + chartH - (1.5 / maxAcwr) * chartH;
-      doc.moveTo(startX, dangerY).lineTo(startX + chartW, dangerY).dash(5, { space: 5 }).stroke('#ff4444');
-      doc.undash(); // Retira o tracejado para os próximos desenhos
-      doc.fill('#ff4444').fontSize(10).text('Zona de Perigo (1.5)', startX + chartW - 100, dangerY - 15);
-
-      // --- PÁGINA 3: MILESTONES (CARIMBOS DE VIAGEM) ---
-      doc.addPage();
-      doc.fill('#333333').fontSize(18).text('Milestones (Carimbos de Viagem)', 50, 50);
-      doc.rect(50, 80, 495, 120).stroke('#cccccc');
-      doc.fontSize(14).text('Provas Intermediárias e Testes de Fogo', 70, 100);
-      doc.fontSize(12).fillColor('#666666');
-      doc.text('🔸 Prova P2: Meia Maratona Preparatória (12/06) - Concluída', 70, 130);
-      doc.text('🔸 Teste de Fogo: Longão Máximo Alcançado 18km (28/06) - Validado', 70, 155);
-
-      // --- PÁGINA 4: INVENTÁRIO DE BORDO ---
-      doc.addPage();
-      doc.fill('#333333').fontSize(18).text('Inventário de Bordo', 50, 50);
-      doc.rect(50, 80, 495, 150).stroke('#cccccc');
-      doc.fontSize(14).text('Auditoria Final do Ciclo', 70, 100);
-      doc.fontSize(12).fillColor('#666666');
-      doc.text('🔸 Tênis Padrão: UA HOVR Sonic 6 Storm (Status: Ativo)', 70, 130);
-      doc.text('🔸 Evolução Fisiológica: Comparativo de Bioimpedância finalizado (-2% BF)', 70, 155);
-      doc.text('🔸 Força e Resiliência: Total de 36 Sessões IronLog_V2 cumpridas', 70, 180);
+      doc.rect(316, 480, 246, 80).fill('#34495e');
+      doc.fillColor('#ecf0f1').fontSize(14).text('Compliance de Força', 331, 495);
+      doc.fontSize(10).fillColor('#95a5a6').text('IronLog: 12 Sessões\nRisco Articular: Baixo', 331, 520);
 
       doc.end();
     } catch (error) {

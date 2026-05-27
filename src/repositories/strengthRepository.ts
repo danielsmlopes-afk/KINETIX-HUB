@@ -95,8 +95,8 @@ export const strengthRepository = {
     durationMinutes: number, 
     logs: Array<{ exerciseId: string; actualSets: number; actualReps: string; weightUsed: number; notes?: string }>
   ) {
-    return await db.transaction(async (tx) => {
-      const [session] = await tx.insert(workoutSessions).values({
+    try {
+      const [session] = await db.insert(workoutSessions).values({
         athleteId,
         date: new Date(),
         durationMinutes
@@ -111,9 +111,12 @@ export const strengthRepository = {
           weightUsed: log.weightUsed,
           notes: log.notes || null
         }));
-        await tx.insert(strengthLogs).values(logsToInsert);
+        await db.insert(strengthLogs).values(logsToInsert);
       }
       return session;
-    });
+    } catch (error) {
+      console.error('[IRONLOG] Erro ao salvar:', error);
+      throw new Error('Falha ao registrar sessão de força no banco de dados.');
+    }
   }
 };
