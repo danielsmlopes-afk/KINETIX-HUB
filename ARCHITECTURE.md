@@ -24,14 +24,17 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 7. **Painel de Controle IA (Circuit Breaker)**: Interface de depuração (Debug) no App para disparar cronjobs manualmente, com fallback automático no Backend caso a API do Google Gemini sofra instabilidade.
 8. **Análise Clínica Semanal (Bioimpedância)**: Ao registrar nova medição, o sistema compara com dados de 7 dias atrás e aciona a IA para um parecer clínico de deltas (Peso, Músculo, Gordura).
 9. **Suporte a Dupla Distância (UI)**: Cards de treino no Flutter renderizam simultaneamente a distância real da planilha vs distância do painel (consolidada com repouso) para validação visual em esteira.
-10. **Algoritmo de Periodização Dinâmica (IA)**: A geração de macrociclos no Motor Hono é adaptável. O Head Coach calcula as semanas disponíveis até qualquer prova (P1/P2/P3), aplica Compressão de Semanas na Fase de Base se necessário, insere Janelas de Teste para P2 e ignora Tapering para P3.
+10. **Algoritmo de Periodização Dinâmica (IA - BioMedal V11)**: A geração de macrociclos pelo Head Coach segue as Leis Imutáveis do Micro-Ciclo:
+    - **Mesociclo 3:1**: Aplicação de blocos de 3 semanas de carga contínua seguidas por 1 semana obrigatória de *Deload* (redução de 30-40% do volume).
+    - **Janelas Estratégicas P2**: Alocação de provas secundárias (P2) rigorosamente nas semanas 4/5 ou 11/12 do ciclo da prova P1 alvo.
+    - **Proteção Articular e do Longão**: É terminantemente proibido alocar a Ficha A (Inferiores) aos sábados.
+    - **Isolamento de Painel de Esteira**: O fracionamento de Aquecimento e Desaquecimento na base de dados ocorre de forma condicional, exclusivamente para treinos intervalados (Tiros). Outras rodagens possuem métricas consolidadas em painel único.
 
 ## ⚠️ Gestão de Dívida Técnica (Tech Debt)
 - **Dados Mockados (Frontend)**: O *Arsenal* e o painel de Debug já estão consumindo dados reais. Foco total em conectar as Fichas de *Laboratório* via Repositórios no Backend.
 - **Engine de ACWR**: Refatorar o monitoramento de Carga Aguda vs. Crônica para refletir as punições e compensações das rotas `COMPLETED_NOT_VALIDATED`.
 
 ## 🚀 Próximos Passos
-- Implementar o gatilho automático no Webhook do Strava para notificar quando a **vida útil de um tênis atingir o teto de 800km**.
 - Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
 - Aprimorar relatórios visuais estendendo as lógicas do motor nativo de PDF.
 
@@ -79,9 +82,11 @@ kinetix_app/
 
 - **`[coachService.ts]`** (`kinetix-api/src/services/coachService.ts`): Cérebro do sistema de auditoria. Analisa os webhooks do Strava cruzando com a planilha para determinar compliance de *volume*, *intensidade*, rua e esteira.
 - **`[macrocycleService.ts]`** (`kinetix-api/src/services/macrocycleService.ts`): Serviço autônomo que intercepta cadastros de provas e gera via Head Coach IA a estrutura tática de um macrociclo dinâmico adaptado às semanas restantes e prioridade (P1/P2/P3), com notificações ao Telegram.
+- **`[reportController.ts]` & `[pdfGeneratorService.ts]`**: Motor Vetorial responsável por gerar PDFs nativos via `pdfkit` (Logbook, Raio-X, Auditoria de Força), encapsulando lógica de primitivas de desenho geométrico para gráficos.
+- **`[dossierController.ts]`**: Controlador executivo que lista relatórios gerados/salvos e fornece as URLs para o `url_launcher` do Flutter.
 - **`[strengthRepository.ts]`** (`kinetix-api/src/repositories/strengthRepository.ts`): Gerencia a persistência das Fichas de Treino e Auditoria (IronLog), isolando lógicas de JOIN entre templates, exercícios e os registros efetivamente realizados na sessão.
 - **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Inclui proteção de *Circuit Breaker* e respostas de contingência para evitar gargalos na API do Google.
-- **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava e repassa Laps e Flags para validação.
+- **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava, despacha de forma assíncrona (não-bloqueante) a dedução de logística (Géis) e arsenal (Tênis) via `workoutService`, e repassa Laps e Flags para a validação tática do Coach.
 - **`[treadmillProtocol.ts]`** (`kinetix-api/src/services/treadmillProtocol.ts`): Isolamento matemático para validação estrita de atividades indoor (Ignora o GPS, reconstrói parciais via Moving Time e calcula margens dinâmicas de repouso passivo).
 - **`[briefingService.ts]`** (`kinetix-api/src/services/briefingService.ts`): Orquestrador do Briefing Diário Noturno. Aplica as regras de ouro logísticas (Gel vs Hidratação) montando o payload em MarkdownV2 rígido.
 - **`[morningRaceService.ts]`** (`kinetix-api/src/services/morningRaceService.ts`): Motor Pré-Prova Matinal. Executa os protocolos de contingência D-3 (Saturação de Glicogênio), D-2 (Pace Chart e Géis) e D-1 (Checklist de Véspera).
@@ -104,6 +109,17 @@ O módulo do Laboratório expõe rotas restritas para a renderização do IronLo
 - **`GET /api/strength/templates/:id/exercises`**: Retorna cirurgicamente os exercícios de uma ficha em particular.
 - **`POST /api/strength/log`**: Registra uma nova sessão no Laboratório. Injeta o cabeçalho base em `workout_sessions` e o detalhamento executado de carga e repetição em `strength_logs`.
 - **`GET /api/strength/log/:sessionId/audit`**: Retorna o espelho comparativo da auditoria tática (Planilha Base vs Execução Real).
+
+## 📄 CAPÍTULO 9: Endpoints de Dossiês e Relatórios (PDF)
+
+O motor vetorial expõe relatórios dinâmicos diretamente em *Buffer* binário, consumidos pela `reports_screen.dart`:
+
+- **`GET /api/dossiers`**: Lista os dossiês executivos estáticos/cloud em JSON.
+- **`GET /api/reports/logbook/latest`**: Baixa o Diário de Viagem em PDF (Gráfico ACWR).
+- **`GET /api/reports/career/me`**: Baixa o Histórico de Combate em PDF.
+- **`GET /api/reports/race/next`**: Baixa o Prontuário de Missão P1 (Checklist & Smart Pace).
+- **`GET /api/reports/cardio/current`**: Baixa o Raio-X Cardiovascular do Mês em PDF.
+- **`GET /api/reports/strength-audit/:sessionId`**: Baixa a auditoria rigorosa de um treino do IronLog.
 
 ## 🔐 CAPÍTULO 3: Variáveis de Ambiente (.env Schema)
 

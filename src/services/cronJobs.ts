@@ -7,6 +7,40 @@ import { briefingService } from './briefingService';
 import { env } from '@/config/env';
 import { askHeadCoach, askHeadCoachForRecalculation } from './headCoachService';
 import { morningRaceService } from './morningRaceService';
+import { macrocycleService } from './macrocycleService';
+
+export async function runMacrocycleQueueJob() {
+  try {
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const jobs = await db.select().from(pendingActions).where(
+      and(eq(pendingActions.athleteId, athlete.id), eq(pendingActions.action, 'GENERATE_MACROCYCLE'))
+    ).limit(1);
+
+    if (jobs.length === 0) return;
+
+    const job = jobs[0];
+    console.log(`⏳ Iniciando processamento do Macrociclo (Job ID: ${job.id}) no Motor IA...`);
+
+    const payload = JSON.parse(job.notes || '{}');
+    if (payload.raceName && payload.distance && payload.raceDate) {
+      await macrocycleService.generateMacrocycle(
+        payload.raceName,
+        payload.distance,
+        new Date(payload.raceDate),
+        payload.priority || 'P1',
+        payload.raceId
+      );
+    }
+
+    await db.delete(pendingActions).where(eq(pendingActions.id, job.id));
+    console.log(`✅ Job de Macrociclo processado e removido da fila.`);
+
+  } catch (error) {
+    console.error('❌ Erro na execução do Task Runner de Macrociclo:', error);
+  }
+}
 
 export async function runDailyBriefingJob() {
   let status = 'SUCCESS';
@@ -233,4 +267,7 @@ export function startCronJobs() {
 
   // Recálculo de Rota (Compliance de Treino): Todos os dias às 23:30
   cron.schedule('30 23 * * *', runRouteRecalculationJob);
+
+  // Task Runner Assíncrono para operações pesadas de IA: A cada 5 minutos
+  cron.schedule('*/5 * * * *', runMacrocycleQueueJob);
 }

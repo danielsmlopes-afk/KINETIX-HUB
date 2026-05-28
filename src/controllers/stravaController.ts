@@ -69,6 +69,17 @@ export const stravaController = {
       return;
     }
 
+    // BLINDAGEM DO MOTOR: Ignora atividades antigas para evitar recálculo tático de rota
+    const activityDate = new Date(String(activity.start_date));
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 1); // Tolerância de 1 dia para sync atrasado
+    limitDate.setHours(0, 0, 0, 0);
+
+    if (activityDate.getTime() < limitDate.getTime()) {
+      console.log(`[Strava] Operação ignorada. Atividade ocorreu no passado (${activityDate.toLocaleDateString('pt-BR')}). Evitando falsos-positivos na auditoria.`);
+      return;
+    }
+
     const distanceKm = Number((Number(activity.distance) / 1000).toFixed(2));
     const movingTimeSeconds = Number(activity.moving_time);
     const paceMins = Math.floor((movingTimeSeconds / 60) / distanceKm);

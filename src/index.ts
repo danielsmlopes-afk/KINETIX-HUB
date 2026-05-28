@@ -5,6 +5,8 @@ import { logger } from 'hono/logger';
 import { apiRoutes } from './routes/api'; // Puxa as suas rotas geradas
 import { debugRoutes } from './routes/debugRoutes';
 import { strengthRoutes } from './routes/strengthRoutes';
+import { reportRoutes } from './routes/reportRoutes';
+import { dossierRoutes } from './routes/dossierRoutes';
 import { startCronJobs } from './services/cronJobs';
 
 const app = new Hono();
@@ -44,6 +46,8 @@ app.get('/api/healthz', (c) => {
 app.route('/api', apiRoutes);
 app.route('/api/debug', debugRoutes);
 app.route('/api/strength', strengthRoutes);
+app.route('/api/reports', reportRoutes);
+app.route('/api/dossiers', dossierRoutes);
 
 // Configuração da porta
 const port = Number(process.env.PORT) || 3000;

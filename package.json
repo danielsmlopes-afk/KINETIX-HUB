@@ -14,7 +14,8 @@
     "db:reset": "tsx src/db/reset.ts",
     "db:migrate-tokens": "tsx src/db/migrateTokens.ts",
     "db:setup": "npm run db:reset && npm run db:push && npm run db:seed && npm run db:migrate-tokens",
-    "db:import-races": "tsx src/services/importPastRaces.ts"
+    "db:import-races": "tsx src/services/importPastRaces.ts",
+    "db:seed-workouts": "tsx src/scripts/seedWorkouts.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.10.1",

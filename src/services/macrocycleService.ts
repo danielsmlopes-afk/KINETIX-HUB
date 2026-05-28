@@ -1,11 +1,25 @@
 import { env } from '@/config/env';
-import { askHeadCoachForMacrocycle } from './headCoachService';
+import { askHeadCoach } from './headCoachService';
 import { escapeMarkdown } from './briefingService';
 import { db } from '@/db';
-import { races, athletes, plannedWorkouts } from '@/db/schema';
+import { races, athletes, plannedWorkouts, pendingActions } from '@/db/schema';
 import { and, between, not, eq } from 'drizzle-orm';
 
 export const macrocycleService = {
+  async queueMacrocycleGeneration(raceName: string, distance: number, raceDate: Date, priority: string, raceId: string): Promise<void> {
+    const athleteList = await db.select().from(athletes).limit(1);
+    if (athleteList.length === 0) return;
+    
+    await db.insert(pendingActions).values({
+      athleteId: athleteList[0].id,
+      workoutId: raceId, // Reaproveitando o campo para transportar o ID da Prova
+      action: 'GENERATE_MACROCYCLE',
+      notes: JSON.stringify({ raceName, distance, raceDate, priority, raceId })
+    });
+    
+    console.log(`[Task Runner] Geração de macrociclo enfileirada para a prova ${raceName}. Será processada em background.`);
+  },
+
   async generateMacrocycle(raceName: string, distance: number, raceDate: Date, priority: string, raceId: string): Promise<void> {
     const dateStr = raceDate.toLocaleDateString('pt-BR');
     const today = new Date();
@@ -28,27 +42,120 @@ export const macrocycleService = {
       ? intermediariasDb.map(r => `${r.name} (${r.distance}km - ${r.category})`).join(', ')
       : 'Nenhuma';
 
-    const regrasDinamicas = `Prioridade: ${priority}. Semanas: ${semanasDisponiveis}. Provas intermediárias: ${provasIntermediarias}. REGRAS: 1. Se < 16 semanas, comprima Fase de Base. Nunca corte Pico e Polimento. Se < 8 semanas, assuma Manutenção. 2. Semana Pós-Prova = Repouso Ativo. 3. Prova P2 deve ser alocada na Semana 4/5 ou 11/12. 4. Prova P3 é Treino de Luxo sem Tapering em Z3.`;
+    const semanaAtualDoCiclo = 1;
+
+    const systemPrompt = `Você é o motor de inteligência artificial Head Coach do sistema BioMedal V11, integrado ao ecossistema KINETIX-HUB. Suas decisões são pautadas pelas diretrizes rígidas de Alta Performance, Proteção Articular e Longevidade Clínica. Sua função é calcular, ajustar e gerar as planilhas de treino baseadas estritamente nas regras paramétricas fornecidas abaixo.
+
+---
+
+### 📋 1. LEIS IMUTÁVEIS DO MICRO-CICLO E DISTRIBUIÇÃO SEMANAL
+Você deve estruturar as semanas travando a distribuição de dias exatamente como se segue, independente da prova alvo (P1 ou P2):
+1. Segunda-feira: REPOUSO ABSOLUTO Inegociável (Sessão = OFF). Absorção estrutural do Longão.
+2. Terça-feira: Corrida de Intensidade (Sessão de Qualidade: Tiros, Limiar ou Tempo Run) + Musculação Ficha B (Anterior + Core).
+3. Quarta-feira: Corrida Leve de Rodagem + Musculação Ficha A (Membros Inferiores).
+4. Quinta-feira: Corrida Regenerativa + Bike (Giro Livre indolor de recuperação ativa - Máximo 2x por semana).
+5. Sexta-feira: REPOUSO ABSOLUTO Inegociável (Janela de supercompensação metabólica).
+6. Sábado: Corrida Leve de Transição + Musculação Ficha C (Posterior + Core).
+   - *PROTEÇÃO DO LONGÃO*: É TERMINANTEMENTE PROIBIDO alocar a Ficha A (Inferiores) no Sábado para evitar a fadiga muscular pré-Longão.
+7. Domingo: Longão de Endurance (Rua ou Esteira). Defende o volume total acumulado e a progressão do ciclo.
+
+---
+
+### 📐 2. REGRA DO MESOCICLO E PERIODIZAÇÃO DINÂMICA
+- A cada bloco de 4 semanas (Mesociclo), aplique rigorosamente a proporção 3:1 (3 semanas de progressão contínua de volume/intensidade seguidas obrigatoriamente por 1 semana de Deload/Regenerativa, onde o volume total de corrida cai entre 30% a 40%, usando a variável semanaAtualDoCiclo como referência).
+- COMPRESSÃO DE TEMPO: Calcule as semanas disponíveis até a prova alvo. Se houver menos de 16 semanas para uma P1, comprima a Fase de Base; nunca reduza as fases de Pico e Polimento (Tapering). Se o calendário for menor que 8 semanas, assuma protocolo de 'Manutenção de Pico'.
+- PÓS-PROVA P1: Garanta que a semana imediatamente após uma prova P1 (21k) seja designada como 'Transição / Repouso Ativo'.
+
+---
+
+### ⏱️ 3. PROTOCOLO DE JANELA DE TEMPO PROTEGIDA (TETO MÁXIMO)
+- Treinos em dias de semana ocorrem à noite (após as 19h) e possuem restrição severa de tempo para proteger o sono do atleta.
+- NENHUMA rodagem de quarta-feira ou treino de dia de semana pode ultrapassar o TETO MÁXIMO de 8 km líquidos na série principal. Qualquer volume sacrificial gerado por essa poda deve ser compensado exclusivamente no Longão de domingo.
+
+---
+
+### 🎛️ 4. ENGENHARIA DE PAINEL PARA ESTEIRA (REGRA CONDICIONAL DE FRACIONAMENTO)
+Isole e calcule as fases de aquecimento e desaquecimento para alimentar as colunas do banco de dados obedecendo estritamente à natureza do treino:
+- REGRA DE OURO: Você SÓ deve gerar e preencher dados de Aquecimento (\`warmup\`) e Desaquecimento (\`cooldown\`) se o treino do dia for um TREINO DE TIROS (Sessão Intervalada de Alta Intensidade).
+- Para qualquer outro tipo de treino (Rodagem Leve, Tempo Run, Ritmado, Regenerativo ou Longão de Endurance), as chaves \`warmup\` e \`cooldown\` devem retornar obrigatoriamente com o valor primitivo JSON \`null\`. Todo o volume e velocidade do dia devem ser consolidados apenas nos campos principais.
+- Parâmetros fixos quando ativados (Apenas em Treino de Tiros):
+  * Aquecimento (\`warmup\`): Valor numérico ou string limpa fixa em "6.5". Proibido adicionar o sufixo "km/h".
+  * Desaquecimento (\`cooldown\`): Valor numérico ou string limpa fixa em "4.5". Proibido adicionar o sufixo "km/h".
+- Velocidade da Série Principal: Expressa de forma explícita em valor equivalente a km/h (ex: "12.5"), baseando-se estritamente na matriz de velocidade injetada.
+
+---
+
+### ⚡ 5. PROTOCOLO RÍGIDO DE RECUPERAÇÃO NOS TIROS (COMPLIANCE DE ESTEIRA)
+Ao calcular treinos intervalados (Sessões de Tiros), aplique a física de esteira rodando para o protocolo de repouso:
+- Tiros com Fração <= 800 metros: O descanso é obrigatoriamente PASSIVO (Pé na lateral da esteira, com o rolo girando direto na velocidade do tiro). O tempo de intervalo deve ser de 1'00" a 1'15".
+- Tiros com Fração > 800 metros: O descanso é obrigatoriamente ATIVO (A esteira deve ser reduced manualmente para 3.0 km/h para caminhada). O tempo de intervalo deve ser exatamente de 2'00".
+
+---
+
+### 📥 6. VARIÁVEIS DINÂMICAS DE ENTRADA (PAYLOAD JSON DA REQUISIÇÃO)
+{
+  "target_race_metadata": {
+    "race_name": "${raceName}",
+    "priority_level": "${priority}",
+    "distance_km": ${distance},
+    "startTime": "${dateStr}",
+    "address": "${(athlete as any).address || 'São Paulo, SP'}"
+  },
+  "speed_matrix_kmh": {
+    "regenerative": 10.3,
+    "easy_base": 12.0,
+    "cruise": 13.2,
+    "threshold": 13.8,
+    "intervals_long": 14.2,
+    "intervals_short": 14.8
+  },
+  "semanasDisponiveis": ${semanasDisponiveis},
+  "semanaAtualDoCiclo": ${semanaAtualDoCiclo}
+}
+
+---
+
+### 📤 7. REGRAS DE HIERARQUIA DE SAÍDA E DIRETRIZES DO FORMALISMO JSON
+1. Se a prioridade for P2: Aloque a prova estrategicamente no ciclo da P1 activa (Janela 1: Semana 4/5 ou Janela 2: Semana 11/12). Se houver sobreposição, adicione obrigatoriamente o prefixo "🔄 RECALCULANDO ROTA: " no início da chave \`name\` do respectivo dia de treino.
+2. Se a prioridade for P3: Declare explicitamente no início do campo \`description\` do dia: 'Treino de Luxo. Sem Tapering ou Carb-Load. Executar em Z3 Aeróbica'.
+3. LINGUAGEM UNIVERSAL DE ALIMENTOS: É EXPRESSAMENTE PROIBIDO usar siglas táticas (P1, C1, V2). Use nomes reais dos alimentos (ex: frango, arroz branco, pão francês, banana, aveia). Regra de Gel: Proibido gel para treinos curtos de tiro ou indoor. Prescrever 1 gel a cada 35-40min apenas para treinos/longões de endurance longos externos > 12km.
+
+REQUISITO OBRIGATÓRIO DE SAÍDA:
+Retorne EXCLUSIVAMENTE a string do array de objetos JSON puro. É terminantemente PROIBIDO incluir tags de marcação markdown como "\`\`\`json" ou qualquer caractere ou texto introdutório/conclusivo fora do array. A resposta deve ser interpretada diretamente por JSON.parse() sem falhas. Se não houver dados para o campo (como \`warmup\`, \`cooldown\` ou \`restDetails\` fora de treinos de tiros), use o tipo nativo JSON \`null\`. As chaves do objeto devem respeitar estritamente o camelCase mapeado para a tabela \`planned_workouts\`:
+
+[
+  {
+    "date": "YYYY-MM-DD",
+    "name": "Nome tático do treino ou OFF",
+    "warmup": "6.5" ou null,
+    "cooldown": "4.5" ou null,
+    "restDetails": "Detalhamento calculated do repouso ou tipo primitivo null",
+    "description": "Especificação técnica da série principal + Identificação da Ficha de Musculação ou Bike do dia"
+  }
+]`;
 
     try {
-      const workouts = await askHeadCoachForMacrocycle({
-        targetRaceName: raceName,
-        targetRaceDate: dateStr,
-        targetDistanceKm: distance,
-        targetPaceInstruction: regrasDinamicas,
-        athleteName: athlete.name || 'Comandante'
-      });
+      const userPrompt = `Gere a planilha para o macrociclo de ${distance}km. Atleta: ${athlete.name || 'Comandante'}. Provas intermediárias detectadas: ${provasIntermediarias}.`;
+      
+      const rawResponse = await askHeadCoach(userPrompt, undefined, systemPrompt);
+      const cleanJsonString = rawResponse.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
+      
+      const workouts = JSON.parse(cleanJsonString);
 
-      if (workouts && workouts.length > 0) {
-        const inserts = workouts.map(w => ({
+      if (Array.isArray(workouts) && workouts.length > 0) {
+        const inserts = workouts.map((w: any) => ({
           athleteId: athlete.id,
           date: new Date(w.date),
-          activityType: w.activityType,
-          title: w.title,
+          activityType: w.warmup ? 'RUN_INTERVAL' : 'RUN_STEADY',
+          title: w.name,
           warmup: w.warmup || null,
           cooldown: w.cooldown || null,
-          details: w.details || {}
+          details: {
+            restDetails: w.restDetails || null,
+            description: w.description
+          }
         }));
+        
         await db.insert(plannedWorkouts).values(inserts);
       }
       

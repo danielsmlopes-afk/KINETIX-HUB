@@ -211,6 +211,88 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
   });
 }
 
+export async function generateLogbookPDF(athleteId: string, startDate: Date, endDate: Date): Promise<Buffer> {
+  const workouts = await db.select().from(plannedWorkouts).where(
+    and(
+      eq(plannedWorkouts.athleteId, athleteId),
+      between(plannedWorkouts.date, startDate, endDate)
+    )
+  ).orderBy(plannedWorkouts.date);
+
+  let validated = 0;
+  let completedNotValidated = 0;
+  let missed = 0;
+
+  const now = new Date();
+
+  workouts.forEach(w => {
+    if (w.complianceStatus === 'VALIDATED') validated++;
+    else if (w.complianceStatus === 'COMPLETED_NOT_VALIDATED') completedNotValidated++;
+    else if (w.complianceStatus === 'MISSED') missed++;
+    else if (!w.complianceStatus && w.date.getTime() < now.getTime()) missed++; // Passou e não registrou
+  });
+
+  const totalEvaluated = validated + completedNotValidated + missed;
+  const valPct = totalEvaluated > 0 ? (validated / totalEvaluated) * 100 : 0;
+  const cnvPct = totalEvaluated > 0 ? (completedNotValidated / totalEvaluated) * 100 : 0;
+  const missedPct = totalEvaluated > 0 ? (missed / totalEvaluated) * 100 : 0;
+
+  return new Promise((resolve, reject) => {
+    const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
+    const doc = new Doc({ margin: 50 });
+    const buffers: Buffer[] = [];
+
+    doc.on('data', (chunk: Buffer) => buffers.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).text('KINETIX HUB - Logbook Tático', { align: 'center' }).moveDown();
+    doc.fontSize(14).text(`Período de Avaliação: ${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`, { align: 'center' }).moveDown(2);
+
+    // GRÁFICO VETORIAL DE ADERÊNCIA (STACKED BAR)
+    doc.fontSize(16).fillColor('black').text('Aderência ao Plano (Compliance)').moveDown(1);
+    
+    const startX = doc.x;
+    const startY = doc.y;
+    const barWidth = 400;
+    const barHeight = 25;
+
+    if (totalEvaluated > 0) {
+      const valW = (valPct / 100) * barWidth;
+      const cnvW = (cnvPct / 100) * barWidth;
+      const missW = (missedPct / 100) * barWidth;
+
+      doc.rect(startX, startY, valW, barHeight).fill('#10b981'); // Verde
+      doc.rect(startX + valW, startY, cnvW, barHeight).fill('#f59e0b'); // Laranja/Amarelo
+      doc.rect(startX + valW + cnvW, startY, missW, barHeight).fill('#ef4444'); // Vermelho
+
+      doc.y = startY + barHeight + 15;
+      doc.fillColor('#10b981').rect(startX, doc.y, 10, 10).fill().fillColor('black').fontSize(10).text(`VALIDATED (${validated} - ${valPct.toFixed(1)}%)`, startX + 15, doc.y - 1);
+      doc.y += 15;
+      doc.fillColor('#f59e0b').rect(startX, doc.y, 10, 10).fill().fillColor('black').text(`COMPLETED NOT VALIDATED (${completedNotValidated} - ${cnvPct.toFixed(1)}%)`, startX + 15, doc.y - 1);
+      doc.y += 15;
+      doc.fillColor('#ef4444').rect(startX, doc.y, 10, 10).fill().fillColor('black').text(`MISSED (${missed} - ${missedPct.toFixed(1)}%)`, startX + 15, doc.y - 1);
+    } else {
+      doc.fontSize(12).text('Nenhum treino avaliado no período.');
+    }
+
+    doc.moveDown(2);
+    doc.fontSize(16).fillColor('black').text('Relatório de Desvios Táticos').moveDown(0.5);
+    const desvios = workouts.filter(w => w.complianceStatus === 'COMPLETED_NOT_VALIDATED' || w.complianceStatus === 'MISSED' || (!w.complianceStatus && w.date.getTime() < now.getTime()));
+    
+    if (desvios.length === 0) {
+      doc.fontSize(10).fillColor('#10b981').text('Excelente! Nenhum desvio tático registrado no período.');
+    } else {
+      desvios.forEach(d => {
+        const status = d.complianceStatus || 'MISSED';
+        doc.fontSize(10).fillColor(status === 'MISSED' ? '#ef4444' : '#f59e0b').text(`[${status}] `, { continued: true }).fillColor('black').text(`${d.date.toLocaleDateString('pt-BR')} - ${d.title}`);
+        doc.moveDown(0.2);
+      });
+    }
+    doc.end();
+  });
+}
+
 export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
   const workouts = await db.select().from(plannedWorkouts)
     .where(eq(plannedWorkouts.athleteId, athleteId))
