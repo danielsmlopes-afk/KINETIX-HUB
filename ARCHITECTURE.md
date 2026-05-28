@@ -57,6 +57,7 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 8. **Análise Clínica Semanal (Bioimpedância)**: Ao registrar nova medição, o sistema compara com dados de 7 dias atrás e aciona a IA para um parecer clínico de deltas (Peso, Músculo, Gordura).
 9. **Suporte a Dupla Distância (UI)**: Cards de treino no Flutter renderizam simultaneamente a distância real da planilha vs distância do painel (consolidada com repouso) para validação visual em esteira.
 10. **Algoritmo de Periodização Dinâmica (IA - BioMedal V11)**: A geração de macrociclos pelo Head Coach segue as Leis Imutáveis do Micro-Ciclo:
+11. **Barra de Progresso de Prova (P1)**: O aplicativo mobile calcula nativamente a progressão do macrociclo na UI, baseado na diferença entre a data atual e a data da prova alvo, dando feedback visual de aderência.
 11. **Digital Twin Endurance (V12.2)**: A telemetria de longo curso extraída do Strava alimenta o modelo preditivo, renderizando análises de Pace vs Frequência Cardíaca na UI do App nativo através da integração gráfica com o `fl_chart`.
     - **Mesociclo 3:1**: Aplicação de blocos de 3 semanas de carga contínua seguidas por 1 semana obrigatória de *Deload* (redução de 30-40% do volume).
     - **Janelas Estratégicas P2**: Alocação de provas secundárias (P2) rigorosamente nas semanas 4/5 ou 11/12 do ciclo da prova P1 alvo.
@@ -188,7 +189,7 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 
 O banco de dados foi preparado e parametrizado para suportar o motor cognitivo:
 - **`races`**: Possui a exclusividade sobre os alvos, englobando colunas logísticas vitais como `address`, `startTime`, `priority`, `latitude` e `longitude`. Responsável direto pelo acionamento do motor OSRM e Despertar Tático.
-- **`planned_workouts`**: (Atualização V12.2) Detém o detalhamento fracionado de treino. O campo JSONB `details` isola as modalidades (`corrida`, `academia`, `bike`, `restDetails`). A tabela agora inclui `mesocycle_stage` (fase do ciclo), `macrocycle_target` (prova alvo) e `long_run_performance_log` (JSONB para o Digital Twin de Endurance).
+- **`planned_workouts`**: (Atualização V12.2) Detém o detalhamento fracionado de treino. O campo JSONB `details` isola as modalidades (`corrida`, `academia`, `bike`, `restDetails`). O acesso ao Drizzle é executado com cast rigoroso (`type WorkoutDetails`) para proteção em ambiente cloud, coibindo erros `TS2339`. A tabela agora inclui `mesocycle_stage` (fase do ciclo), `macrocycle_target` (prova alvo) e `long_run_performance_log` (JSONB para o Digital Twin de Endurance).
 - **`athletes`**: Inclui `homeLat` e `homeLon` mapeadas em dupla precisão flutuante para assegurar cálculos de geolocalização.
 
 ---
