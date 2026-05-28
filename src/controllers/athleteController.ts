@@ -112,7 +112,7 @@ export const athleteController = {
           activityType: w.activityType,
           title: w.title,
           subtitle: details.subtitle || 'Treino Estruturado',
-          restDetails: w.restDetails,
+          restDetails: details.restDetails,
           weather: weatherStr
         };
       });

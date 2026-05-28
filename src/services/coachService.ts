@@ -60,7 +60,7 @@ export const coachService = {
         
         if (planned[0].warmup) plannedWarmup = planned[0].warmup;
         if (planned[0].cooldown) plannedCooldown = planned[0].cooldown;
-        if (planned[0].restDetails) plannedRest = planned[0].restDetails;
+        if (details.restDetails) plannedRest = String(details.restDetails);
         if (Array.isArray(details.intervals)) {
           plannedIntervals = details.intervals as Array<{ distanceMeters: number; speedKmh: number }>;
         }
