@@ -1,5 +1,12 @@
 import { stravaRepository } from '../repositories/stravaRepository';
 import { env } from '../config/env';
+import { and, eq, gte, lte } from 'drizzle-orm';
+import { db } from '@/db';
+import { plannedWorkouts } from '@/db/schema';
+import { getHistoricalWeather } from './weatherService';
+import { askHeadCoach } from './headCoachService';
+import { telegramMessageService } from './telegramMessageService';
+import { athleteRepository } from '@/repositories/athleteRepository';
 
 export interface StravaActivity {
   id: number;
@@ -107,14 +114,97 @@ export class StravaService {
     return await response.json();
   }
 
-  async getAthleteActivities(athleteId: string, page: number = 1, perPage: number = 30): Promise<StravaActivity[]> {
+  async getAthleteActivities(athleteId: string, page: number = 1, perPage: number = 30, after?: number, before?: number): Promise<StravaActivity[]> {
     const token = await this.getValidToken(athleteId);
-    const response = await fetch(`https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`, {
+    const url = new URL('https://www.strava.com/api/v3/athlete/activities');
+    url.searchParams.append('page', page.toString());
+    url.searchParams.append('per_page', perPage.toString());
+    if (after) url.searchParams.append('after', after.toString());
+    if (before) url.searchParams.append('before', before.toString());
+
+    const response = await fetch(url.toString(), {
       headers: { 'Authorization': `Bearer ${token}` }
     });
 
     if (!response.ok) throw new Error('Falha ao buscar histórico de atividades no Strava.');
     
     return await response.json();
+  }
+
+  async scanAndLogEnduranceRun(): Promise<void> {
+    console.log('🤖[Digital Twin V12.2] Iniciando varredura de Endurance (Longão)...');
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const spDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const today = new Date(`${spDateStr}T00:00:00`);
+    const startOfToday = new Date(today);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const activities = await this.getAthleteActivities(athlete.id, 1, 10, Math.floor(startOfToday.getTime() / 1000), Math.floor(endOfToday.getTime() / 1000));
+    
+    const longRun = activities
+        .filter(a => a.type === 'Run' && (a.distance / 1000) >= 4.9)
+        .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0];
+
+    if (!longRun) {
+        console.log('✅[Digital Twin] Nenhum longão encontrado para hoje.');
+        return;
+    }
+
+    const planned = await db.select().from(plannedWorkouts).where(
+        and(
+            eq(plannedWorkouts.athleteId, athlete.id),
+            gte(plannedWorkouts.date, startOfToday),
+            lte(plannedWorkouts.date, endOfToday),
+            eq(plannedWorkouts.activityType, 'RUN')
+        )
+    ).orderBy(plannedWorkouts.date).limit(1);
+
+    if (!planned.length) {
+        console.log('⚠️[Digital Twin] Longão encontrado no Strava, mas sem treino correspondente na planilha.');
+        return;
+    }
+    const plannedWorkout = planned[0];
+
+    let weather = 'N/A';
+    if (longRun.start_latlng && longRun.start_latlng.length === 2) {
+        weather = await getHistoricalWeather(longRun.start_latlng[0], longRun.start_latlng[1], longRun.start_date) || 'N/A';
+    }
+
+    const context = {
+        distanciaReal: (longRun.distance / 1000).toFixed(2),
+        paceReal: new Date(longRun.moving_time * 1000).toISOString().substr(14, 5),
+        cardio: longRun.average_heartrate,
+        clima: weather,
+        planejado: plannedWorkout.details,
+    };
+    const prompt = `Analise a performance do longão de hoje. Gere um score de 5 a 10 e uma análise de 4 linhas sobre o desempenho, considerando o planejado. Formato de saída JSON: {"score_performance": X, "analise_ia": "..."}`;
+    const aiRawResponse = await askHeadCoach(prompt, context);
+    const aiResponse = JSON.parse(aiRawResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+
+    const performanceLog = {
+        distancia_real: (longRun.distance / 1000).toFixed(2),
+        distancia_meta: (plannedWorkout.details as any)?.corrida,
+        pace_real: new Date(longRun.moving_time * 1000).toISOString().substr(14, 5),
+        pace_meta: (plannedWorkout.details as any)?.corrida?.match(/@\s*(\d{1,2}:\d{2})/)?.[1],
+        laps: longRun.laps,
+        cardio: longRun.average_heartrate,
+        clima: weather,
+        score_performance: aiResponse.score_performance,
+        analise_ia: aiResponse.analise_ia,
+        feedback_dor: null,
+        feedback_hidratacao: null,
+    };
+
+    await db.update(plannedWorkouts)
+        .set({ longRunPerformanceLog: performanceLog })
+        .where(eq(plannedWorkouts.id, plannedWorkout.id));
+
+    const message = `🦾 *Digital Twin: Longão Concluído!*\n\n*Score BioMedal:* ${performanceLog.score_performance}/10\n*Análise IA:* ${aiResponse.analise_ia}\n\nComo você se sentiu? Responda com:\n\`{"dor": "Nenhuma/Leve/Moderada", "hidratacao": "Ok/Insuficiente"}\``;
+    await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), message);
+    
+    console.log(`✅[Digital Twin] Log de performance do longão salvo para o treino ${plannedWorkout.id}.`);
   }
 }

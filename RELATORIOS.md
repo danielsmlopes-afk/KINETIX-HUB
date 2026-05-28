@@ -6,6 +6,8 @@
 O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuais de alta performance (Dossiês e Logbooks) diretamente no backend.
 **Regra de Ouro:** Uso estrito do `pdfkit` gerando gráficos, tabelas e eixos cartesianos nativamente via vetores (sem dependências de frontend como Chart.js ou Canvas).
 
+> **Nota de Arquitetura V11.1:** Os relatórios em PDF e os motores de briefings táticos agora buscam os dados da tabela `planned_workouts` de forma totalmente segmentada. O motor de extração mapeia cada modalidade individualmente pelas propriedades `{ corrida, academia, bike }` dentro do campo JSONB `details`, abandonando completamente o uso da antiga chave genérica `description`.
+
 ## 📂 Estrutura de Arquivos
 
 ```text

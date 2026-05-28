@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { runMorningRaceJob, runDailyBriefingJob, runRouteRecalculationJob } from '../services/cronJobs';
+import { runMorningRaceJob, runDailyBriefingJob, runRouteRecalculationJob, runWeeklyReportJob } from '../services/cronJobs';
 
 export const debugRoutes = new Hono();
 
@@ -33,5 +33,16 @@ debugRoutes.post('/trigger/route-recalculation', async (c) => {
   } catch (error) {
     console.error(error);
     return c.json({ success: false, error: 'Erro ao executar o cronjob de recálculo.' }, 500);
+  }
+});
+
+// Dispara manualmente o Relatório Semanal em PDF (Dominical)
+debugRoutes.post('/trigger/weekly-report', async (c) => {
+  try {
+    await runWeeklyReportJob();
+    return c.json({ success: true, message: 'Cronjob de Relatório Semanal disparado com sucesso!' });
+  } catch (error) {
+    console.error(error);
+    return c.json({ success: false, error: 'Erro ao executar o cronjob de relatório semanal.' }, 500);
   }
 });

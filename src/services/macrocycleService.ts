@@ -120,8 +120,8 @@ Ao calcular treinos intervalados (Sessões de Tiros), aplique a física de estei
 2. Se a prioridade for P3: Declare explicitamente no início do campo \`description\` do dia: 'Treino de Luxo. Sem Tapering ou Carb-Load. Executar em Z3 Aeróbica'.
 3. LINGUAGEM UNIVERSAL DE ALIMENTOS: É EXPRESSAMENTE PROIBIDO usar siglas táticas (P1, C1, V2). Use nomes reais dos alimentos (ex: frango, arroz branco, pão francês, banana, aveia). Regra de Gel: Proibido gel para treinos curtos de tiro ou indoor. Prescrever 1 gel a cada 35-40min apenas para treinos/longões de endurance longos externos > 12km.
 
-REQUISITO OBRIGATÓRIO DE SAÍDA:
-Retorne EXCLUSIVAMENTE a string do array de objetos JSON puro. É terminantemente PROIBIDO incluir tags de marcação markdown como "\`\`\`json" ou qualquer caractere ou texto introdutório/conclusivo fora do array. A resposta deve ser interpretada diretamente por JSON.parse() sem falhas. Se não houver dados para o campo (como \`warmup\`, \`cooldown\` ou \`restDetails\` fora de treinos de tiros), use o tipo nativo JSON \`null\`. As chaves do objeto devem respeitar estritamente o camelCase mapeado para a tabela \`planned_workouts\`:
+REQUISITO OBRIGATÓRIO DE SAÍDA E ESTRUTURAMENTO:
+É EXPRESSAMENTE PROIBIDO agrupar as atividades em um único campo de texto genérico (como 'description'). O LLM deve segmentar e isolar as modalidades em suas respectivas chaves exclusivas. Retorne EXCLUSIVAMENTE a string do array de objetos JSON puro. É terminantemente PROIBIDO incluir tags de marcação markdown como "\`\`\`json" ou qualquer caractere ou texto introdutório/conclusivo fora do array. A resposta deve ser interpretada diretamente por JSON.parse() sem falhas. Se não houver dados para o campo, use o tipo nativo JSON \`null\`. As chaves do objeto devem respeitar estritamente o camelCase:
 
 [
   {
@@ -129,8 +129,11 @@ Retorne EXCLUSIVAMENTE a string do array de objetos JSON puro. É terminantement
     "name": "Nome tático do treino ou OFF",
     "warmup": "6.5" ou null,
     "cooldown": "4.5" ou null,
-    "restDetails": "Detalhamento calculated do repouso ou tipo primitivo null",
-    "description": "Especificação técnica da série principal + Identificação da Ficha de Musculação ou Bike do dia"
+    "restDetails": "Detalhamento calculado do repouso ou null",
+    "corrida": "Especificação da série principal de corrida (distância/pace) ou null",
+    "academia": "Nome da ficha de musculação (A, B, C) ou null",
+    "bike": "Instruções de Giro Livre na bike ou null",
+    "mesocycleStage": "Número inteiro (1, 2, 3 ou 4) representando a fase do mesociclo (1=Base, 2=Carga, 3=Pico, 4=Deload/Taper)"
   }
 ]`;
 
@@ -146,14 +149,18 @@ Retorne EXCLUSIVAMENTE a string do array de objetos JSON puro. É terminantement
         const inserts = workouts.map((w: any) => ({
           athleteId: athlete.id,
           date: new Date(w.date),
-          activityType: w.warmup ? 'RUN_INTERVAL' : 'RUN_STEADY',
+          activityType: w.warmup ? 'RUN_INTERVAL' : (w.bike && !w.corrida ? 'BIKE' : (w.academia && !w.corrida && !w.bike ? 'STRENGTH' : 'RUN')),
           title: w.name,
           warmup: w.warmup || null,
           cooldown: w.cooldown || null,
           details: {
             restDetails: w.restDetails || null,
-            description: w.description
-          }
+            corrida: w.corrida || null,
+            academia: w.academia || null,
+            bike: w.bike || null,
+          },
+          mesocycleStage: w.mesocycleStage,
+          macrocycleTarget: raceName,
         }));
         
         await db.insert(plannedWorkouts).values(inserts);

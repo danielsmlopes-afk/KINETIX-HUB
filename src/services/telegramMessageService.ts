@@ -158,5 +158,9 @@ export const telegramMessageService = {
         return sendMsg(chatId, "❌ Falha ao interpretar JSON.");
       }
     }
-  }
+  },
+
+  async sendSimpleMessage(chatId: number, text: string): Promise<void> {
+    await sendMsg(chatId, text);
+  },
 };

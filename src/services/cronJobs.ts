@@ -8,6 +8,18 @@ import { env } from '@/config/env';
 import { askHeadCoach, askHeadCoachForRecalculation } from './headCoachService';
 import { morningRaceService } from './morningRaceService';
 import { macrocycleService } from './macrocycleService';
+import { StravaService } from './stravaService';
+import { generateWorkoutReportHtml } from './workoutReportGenerator';
+// @ts-ignore
+import weasyprint from 'weasyprint-wrapper';
+
+/**
+ * 🛡️ BLINDAGEM DE FUSO-HORÁRIO (UTC-3): Evita a "Meia-Noite Fantasma" de servidores remotos.
+ */
+const getSPDate = () => {
+  const spDateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  return new Date(`${spDateStr}T00:00:00`);
+};
 
 export async function runMacrocycleQueueJob() {
   try {
@@ -52,9 +64,8 @@ export async function runDailyBriefingJob() {
     const athlete = await athleteRepository.getPrimaryAthlete();
     if (!athlete) return;
 
-    const tomorrow = new Date();
+    const tomorrow = getSPDate();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
     const endOfTomorrow = new Date(tomorrow);
     endOfTomorrow.setHours(23, 59, 59, 999);
 
@@ -112,7 +123,7 @@ export async function runRouteRecalculationJob() {
     const athlete = await athleteRepository.getPrimaryAthlete();
     if (!athlete) return;
 
-    const today = new Date();
+    const today = getSPDate();
     const startOfToday = new Date(today.setHours(0, 0, 0, 0));
     const endOfToday = new Date(today.setHours(23, 59, 59, 999));
 
@@ -217,7 +228,7 @@ export async function runMorningRaceJob() {
     const athlete = await athleteRepository.getPrimaryAthlete();
     if (!athlete) return;
 
-    const today = new Date();
+    const today = getSPDate();
     today.setHours(0, 0, 0, 0);
 
     const next3Days = new Date(today);
@@ -258,16 +269,78 @@ export async function runMorningRaceJob() {
   }
 }
 
-export function startCronJobs() {
-  // Rotina Matinal (D-3, D-2, D-1 da Prova): Todos os dias às 07:00
-  cron.schedule('0 7 * * *', runMorningRaceJob);
+export async function runWeeklyReportJob() {
+  let status = 'SUCCESS';
+  let logMessage = 'Relatório Semanal em PDF gerado e enviado.';
 
-  // Disparo diário às 22h00
-  cron.schedule('0 22 * * *', runDailyBriefingJob);
+  try {
+    console.log('⏳ Iniciando Cron: Relatório Semanal (WeasyPrint)...');
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const today = getSPDate();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+    nextWeek.setHours(23, 59, 59, 999);
+
+    const workouts = await db.select().from(plannedWorkouts).where(
+      and(eq(plannedWorkouts.athleteId, athlete.id), gte(plannedWorkouts.date, today), lte(plannedWorkouts.date, nextWeek))
+    ).orderBy(plannedWorkouts.date);
+
+    // 1. Geração HTML (WeasyPrint Compliance)
+    const html = generateWorkoutReportHtml(workouts as any);
+
+    // 2. ENGINE DE COMPILAÇÃO WEASYPRINT EM BACKGROUND (Buffer PDF Real)
+    const pdfBuffer = await weasyprint(html);
+
+    // 3. Despacho do PDF via Telegram
+    const formData = new FormData();
+    formData.append('chat_id', env.TELEGRAM_CHAT_ID);
+    formData.append('document', new Blob([pdfBuffer]), 'Planilha_Semanal_Kinetix_V12.pdf');
+    formData.append('caption', '📊 *Dossiê Semanal V12.2*\nO seu mapa tático para os próximos 7 dias.');
+
+    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, {
+      method: 'POST',
+      body: formData
+    });
+
+    console.log('✅ Cron: Relatório Semanal enviado.');
+  } catch (error) {
+    status = 'ERROR';
+    logMessage = error instanceof Error ? error.message : 'Erro no Relatório Semanal';
+    console.error('❌ Erro no Cron Weekly Report:', error);
+  } finally {
+    try { await db.insert(cronLogs).values({ jobName: 'Weekly PDF Report', status, message: logMessage }); } catch (e) {}
+  }
+}
+
+export async function runEnduranceScanJob() {
+  try {
+    const stravaService = new StravaService();
+    await stravaService.scanAndLogEnduranceRun();
+  } catch (error) {
+    console.error('❌ Erro no Cron de Varredura de Endurance:', error);
+  }
+}
+
+export function startCronJobs() {
+  const opts = { timezone: 'America/Sao_Paulo' };
+
+  // Rotina Matinal (D-3, D-2, D-1 da Prova): Todos os dias às 07:00
+  cron.schedule('0 7 * * *', runMorningRaceJob, opts);
+
+  // Varredura de Endurance (Digital Twin): Domingos às 14:59
+  cron.schedule('59 14 * * 0', runEnduranceScanJob, opts);
+
+  // Relatório Dominical de Exportação (WeasyPrint): Domingos às 15:00
+  cron.schedule('0 15 * * 0', runWeeklyReportJob, opts);
+
+  // Disparo Diário de Briefing Tático do dia seguinte: Às 22:30
+  cron.schedule('30 22 * * *', runDailyBriefingJob, opts);
 
   // Recálculo de Rota (Compliance de Treino): Todos os dias às 23:30
-  cron.schedule('30 23 * * *', runRouteRecalculationJob);
+  cron.schedule('30 23 * * *', runRouteRecalculationJob, opts);
 
   // Task Runner Assíncrono para operações pesadas de IA: A cada 5 minutos
-  cron.schedule('*/5 * * * *', runMacrocycleQueueJob);
+  cron.schedule('*/5 * * * *', runMacrocycleQueueJob, opts);
 }

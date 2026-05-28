@@ -15,7 +15,7 @@
     "db:migrate-tokens": "tsx src/db/migrateTokens.ts",
     "db:setup": "npm run db:reset && npm run db:push && npm run db:seed && npm run db:migrate-tokens",
     "db:import-races": "tsx src/services/importPastRaces.ts",
-    "db:seed-workouts": "tsx src/scripts/seedWorkouts.ts"
+    "seed:workouts": "tsx src/scripts/seedWorkouts.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.10.1",
@@ -27,6 +27,7 @@
     "node-cron": "^3.0.3",
     "pdfkit": "^0.15.2",
     "pg": "^8.21.0",
+    "weasyprint-wrapper": "^1.0.2",
     "zod": "^3.23.6"
   },
   "devDependencies": {

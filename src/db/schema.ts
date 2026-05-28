@@ -121,10 +121,13 @@ export const plannedWorkouts = pgTable('planned_workouts', {
   // Detalhamento fracionado tático e tempos de repouso
   warmup: text('warmup'),
   cooldown: text('cooldown'),
-  restDetails: text('rest_details'),
   details: jsonb('details'),
   isImported: boolean('is_imported').default(true),
   complianceStatus: text('compliance_status'), // 'VALIDATED' | 'COMPLETED_NOT_VALIDATED' | null
+  // V12.2 - Orquestração de Macrociclo e Digital Twin
+  mesocycleStage: integer('mesocycle_stage'), // 1=Base, 2=Carga, 3=Pico, 4=Deload/Taper
+  macrocycleTarget: text('macrocycle_target'),
+  longRunPerformanceLog: jsonb('long_run_performance_log'),
 });
 
 export const cronLogs = pgTable('cron_logs', {

@@ -52,13 +52,17 @@ Use um tom clínico, focado em performance e proteção.`;
    */
   public async generateNightlyBriefing(workout: PlannedWorkout): Promise<string> {
     // Parse rígido e seguro da coluna JSONB 'details'
-    const details = workout.details as Record<string, unknown> | null;
-    const seriePrincipal = typeof details?.subtitle === 'string' ? details.subtitle : 'Treino Base';
+    const details = workout.details as { corrida?: string; academia?: string; bike?: string; restDetails?: string } | null;
+    
+    // Constrói a "Série Principal" a partir das colunas isoladas V11+
+    const seriePrincipalParts = [details?.corrida, details?.academia, details?.bike].filter(Boolean);
+    const seriePrincipal = seriePrincipalParts.length > 0 ? seriePrincipalParts.join(' + ') : 'Treino Base';
+    const restDetails = details?.restDetails ?? null;
 
     // Chamada ao Motor Cognitivo (IA Gemini via askHeadCoach)
     const popStr = await this.getWeatherPoP();
     const systemPrompt = this.getLogisticsSystemPrompt();
-    const userPrompt = `Alvo: ${workout.title}\nTipo: ${workout.activityType}\nDistância/Tempo: ${JSON.stringify(details)}`;
+    const userPrompt = `Alvo: ${workout.title}\nTipo: ${workout.activityType}\nSérie Principal: ${seriePrincipal}`;
     const aiResponse = await askHeadCoach(userPrompt, undefined, systemPrompt);
 
     // PARTE 2: Montagem do Template Tático no padrão MarkdownV2 do Telegram
@@ -66,7 +70,7 @@ Use um tom clínico, focado em performance e proteção.`;
 🔸 Alvo: ${escapeMarkdown(workout.title)}
    🔥 Ignição: ${escapeMarkdown(workout.warmup)}
    ⚡ Série Principal: ${escapeMarkdown(seriePrincipal)}
-   ⏸️ Protocolo de Repouso: ${escapeMarkdown(workout.restDetails)}
+   ⏸️ Protocolo de Repouso: ${escapeMarkdown(restDetails)}
    ❄️ Resfriamento: ${escapeMarkdown(workout.cooldown)}
    ${escapeMarkdown(popStr)}
    

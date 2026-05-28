@@ -1,20 +1,52 @@
 # 🏗️ KINETIX HUB - Fonte Única de Verdade (Single Source of Truth)
 
-## 🧠 Stack Tecnológico & Ecossistema
+## 📑 Índice
+1.  Capítulo 1: Visão Geral e Compliance do Ecossistema
+    *   Guia de Referência Técnica (SERVICES.md)
+    *   Guia de Front-End e UI (APP.md)
+    *   Stack Tecnológico & Ecossistema
+    *   Status de Compliance e Zonas de Treinamento
+    *   Funcionalidades Ativas
+    *   Gestão de Dívida Técnica (Tech Debt)
+    *   Próximos Passos
+2.  Capítulo 2: Árvore de Diretórios (Clean Architecture)
+3.  Capítulo 3: Dicionário de Arquivos Principais (Core Files)
+4.  Capítulo 4: Schema do Banco de Dados (Drizzle ORM)
+5.  Capítulo 5: Validação de Schema (Telemetria e Provas)
+6.  Capítulo 6: Cronjobs e Automações (O Relógio Mestre)
+7.  Capítulo 7: Endpoints de Força (IronLog)
+8.  Capítulo 8: Endpoints de Dossiês e Relatórios (PDF Engine)
+9.  Capítulo 9: Scripts Utilitários e Operações Táticas
+10. Capítulo 10: Variáveis de Ambiente e Segurança (.env)
+
+---
+
+## Capítulo 1: Visão Geral e Compliance do Ecossistema
+
+### Guia de Referência Técnica
+Para um mapeamento exato de todos os Controladores, Rotas e Serviços do Backend, consulte obrigatoriamente o arquivo tático **`SERVICES.md`** na raiz da API.
+Para o mapeamento do App Mobile, Clean Architecture e consumo da UI, consulte o documento **`src/docs/APP.md`**.
+
+### Política de Sincronismo Temporal (Timezone)
+O KINETIX HUB opera com **Fuso Horário Oficial Blindado em América/Sao_Paulo (UTC-3)**. 
+* A "Meia-Noite Fantasma" de servidores em UTC não afeta os relógios mestres da aplicação. Todas as instâncias de datas computadas para consultas de briefings e painéis calculam o "hoje" e o "amanhã" usando a projeção explícita de calendário brasileiro (`new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })`).
+* A orquestração global no `node-cron` força o fuso horário paramétrico para evitar descompassos em deploys internacionais (Neon/Render).
+
+### Stack Tecnológico & Ecossistema
 - **Backend**: Node.js + Hono (API REST leve e rápida). Validações rígidas de Schema com Zod.
 - **Database**: Neon (PostgreSQL Serverless) gerenciado com Drizzle ORM (tipagem estrita, zero 'any').
 - **Frontend**: Aplicativo Flutter com **Clean Architecture**, isolando lógicas de Apresentação (UI) das camadas de Domínio e Dados (API), agrupadas por `features` (`spreadsheet`, `dashboard`).
 - **Motor de IA**: Gemini 2.5 Flash / Groq operando a inteligência tática (*Head Coach*).
 - **Integrações**: Strava Webhooks, Telegram Bot API, OpenWeatherMap.
 
-## 🎯 Status de Compliance e Zonas de Treinamento
+### Status de Compliance e Zonas de Treinamento
 Os treinos e atividades passam por nossa Engine de Validação e são persistidos estritamente sob as seguintes flags:
 - **`VALIDATED`**: Treino realizado rigorosamente dentro da planilha e metas traçadas.
 - **`COMPLETED_NOT_VALIDATED`**: Atleta treinou, mas o volume ou ritmo divergiram (tolerância de +/- 3% e 15s) ou houve falha no protocolo de *Laps* (Esteira).
 - **`MISSED`**: Treino não detectado na telemetria e marcado como perdido/faltante.
 - **Zonas de Esforço**: Parametrizadas taticamente de Z1 a Z5 (Regenerativo ao Anaeróbico Máximo) balizando o motor de *Pacing*.
 
-## ✅ Funcionalidades Ativas
+### Funcionalidades Ativas
 1. **Ingestão Tática (CSV/JSON)**: Carga inteligente de macrociclos estruturados no banco.
 2. **Radar de Telemetria (Strava)**: Captura de atividades via Webhook, dedução automática de Arsenal (vida útil do tênis) e Estoque (Géis).
 3. **Dashboard Mobile (Flutter)**: UI reativa integrada com telemetria corporal e alertas climáticos (OpenWeatherMap).
@@ -25,22 +57,23 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 8. **Análise Clínica Semanal (Bioimpedância)**: Ao registrar nova medição, o sistema compara com dados de 7 dias atrás e aciona a IA para um parecer clínico de deltas (Peso, Músculo, Gordura).
 9. **Suporte a Dupla Distância (UI)**: Cards de treino no Flutter renderizam simultaneamente a distância real da planilha vs distância do painel (consolidada com repouso) para validação visual em esteira.
 10. **Algoritmo de Periodização Dinâmica (IA - BioMedal V11)**: A geração de macrociclos pelo Head Coach segue as Leis Imutáveis do Micro-Ciclo:
+11. **Digital Twin Endurance (V12.2)**: A telemetria de longo curso extraída do Strava alimenta o modelo preditivo, renderizando análises de Pace vs Frequência Cardíaca na UI do App nativo através da integração gráfica com o `fl_chart`.
     - **Mesociclo 3:1**: Aplicação de blocos de 3 semanas de carga contínua seguidas por 1 semana obrigatória de *Deload* (redução de 30-40% do volume).
     - **Janelas Estratégicas P2**: Alocação de provas secundárias (P2) rigorosamente nas semanas 4/5 ou 11/12 do ciclo da prova P1 alvo.
     - **Proteção Articular e do Longão**: É terminantemente proibido alocar a Ficha A (Inferiores) aos sábados.
     - **Isolamento de Painel de Esteira**: O fracionamento de Aquecimento e Desaquecimento na base de dados ocorre de forma condicional, exclusivamente para treinos intervalados (Tiros). Outras rodagens possuem métricas consolidadas em painel único.
 
-## ⚠️ Gestão de Dívida Técnica (Tech Debt)
+### Gestão de Dívida Técnica (Tech Debt)
 - **Dados Mockados (Frontend)**: O *Arsenal* e o painel de Debug já estão consumindo dados reais. Foco total em conectar as Fichas de *Laboratório* via Repositórios no Backend.
 - **Engine de ACWR**: Refatorar o monitoramento de Carga Aguda vs. Crônica para refletir as punições e compensações das rotas `COMPLETED_NOT_VALIDATED`.
 
-## 🚀 Próximos Passos
+### Próximos Passos
 - Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
 - Aprimorar relatórios visuais estendendo as lógicas do motor nativo de PDF.
 
 ---
 
-## 📂 CAPÍTULO 1: Árvore de Diretórios Completa
+## Capítulo 2: Árvore de Diretórios (Clean Architecture)
 
 Abaixo detalhamos a arquitetura física (Clean Architecture adaptada) presente no servidor e no App:
 
@@ -101,47 +134,14 @@ kinetix_app/
 - **`[iron_log_screen.dart]`** (`kinetix_app/lib/features/laboratory/iron_log_screen.dart`): Interface de registro do treino de força (IronLog). Ao receber uma ficha, busca seus exercícios e permite que o atleta insira a carga (kg) e repetições realizadas, persistindo a sessão via `POST /api/strength/log`.
 - **`[reports_screen.dart]`** (`kinetix_app/lib/features/dossiers/reports_screen.dart`): Tela que exibe e possibilita o download assíncrono em array de bytes dos relatórios PDF gerados nativamente pelo motor vetorial Hono.
 
-## 🏋️ CAPÍTULO 8: Endpoints de Força (IronLog)
+---
 
-O módulo do Laboratório expõe rotas restritas para a renderização do IronLog no Frontend Flutter:
+## Capítulo 4: Schema do Banco de Dados (Drizzle ORM)
 
 - **`GET /api/strength/templates`**: Retorna a relação completa das fichas de treino com o detalhamento de exercícios, séries e repetições (Faz o JOIN de `workout_templates`, `workout_template_items` e `exercise_library`).
 - **`GET /api/strength/templates/:id/exercises`**: Retorna cirurgicamente os exercícios de uma ficha em particular.
 - **`POST /api/strength/log`**: Registra uma nova sessão no Laboratório. Injeta o cabeçalho base em `workout_sessions` e o detalhamento executado de carga e repetição em `strength_logs`.
 - **`GET /api/strength/log/:sessionId/audit`**: Retorna o espelho comparativo da auditoria tática (Planilha Base vs Execução Real).
-
-## 📄 CAPÍTULO 9: Endpoints de Dossiês e Relatórios (PDF)
-
-O motor vetorial expõe relatórios dinâmicos diretamente em *Buffer* binário, consumidos pela `reports_screen.dart`:
-
-- **`GET /api/dossiers`**: Lista os dossiês executivos estáticos/cloud em JSON.
-- **`GET /api/reports/logbook/latest`**: Baixa o Diário de Viagem em PDF (Gráfico ACWR).
-- **`GET /api/reports/career/me`**: Baixa o Histórico de Combate em PDF.
-- **`GET /api/reports/race/next`**: Baixa o Prontuário de Missão P1 (Checklist & Smart Pace).
-- **`GET /api/reports/cardio/current`**: Baixa o Raio-X Cardiovascular do Mês em PDF.
-- **`GET /api/reports/strength-audit/:sessionId`**: Baixa a auditoria rigorosa de um treino do IronLog.
-
-## 🔐 CAPÍTULO 3: Variáveis de Ambiente (.env Schema)
-
-As chaves de sistema garantem a segurança e conectividade do motor. **Nunca insira valores reais aqui.**
-
-- **`DATABASE_URL`**: String de conexão ao banco de dados PostgreSQL (Neon DB).
-- **`PORT`**: Porta operacional do backend Hono.
-- **`GEMINI_API_KEY`**: Chave do Google AI Studio para instanciar o *Head Coach*.
-- **`STRAVA_CLIENT_ID`**: ID numérico fornecido pelo painel do desenvolvedor do Strava.
-- **`STRAVA_CLIENT_SECRET`**: Segredo para troca de tokens com a API do Strava.
-- **`STRAVA_REDIRECT_URI`**: URL de retorno pós-autenticação OAuth.
-- **`STRAVA_VERIFY_TOKEN`**: String manual para validar o aperto de mãos na criação do Webhook.
-- **`TELEGRAM_BOT_TOKEN`**: Token do @BotFather para disparar o Briefing Diário e Análises.
-- **`TELEGRAM_CHAT_ID`**: ID do canal/grupo focado entre o Atleta e o Sistema.
-- **`OPENWEATHER_API_KEY`**: Chave de telemetria climática (Pacing/Temperatura).
-- **`FIREBASE_PROJECT_ID`**: Variável do Middleware de Autenticação (App <-> Hono).
-
-> **🚨 ALERTA DE SEGURANÇA (AUDIENCE MISMATCH):**
-> O `FIREBASE_PROJECT_ID` do Backend (e sua respectiva *Service Account JSON*) **DEVE ser estritamente igual** ao `projectId` configurado no Frontend (`lib/firebase_options.dart`). 
-> Divergências entre projetos (ex: App a gerar JWT em `kinetix-hub` e Hono a validar em `danielprocoach`) causarão o erro bloqueante de `incorrect "aud" (audience) claim` e a API retornará 401 Unauthorized.
-
-## 🗄️ CAPÍTULO 4: Schema do Banco de Dados (Drizzle ORM)
 
 Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 
@@ -184,27 +184,75 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 
 ---
 
-## ⏱️ CAPÍTULO 5: Cronjobs e Automações (Agendamentos)
+## Capítulo 5: Validação de Schema (Telemetria e Provas)
 
-A engrenagem autônoma do KINETIX HUB funciona com base em intervalos cirúrgicos para orquestrar os protocolos militares:
+O banco de dados foi preparado e parametrizado para suportar o motor cognitivo:
+- **`races`**: Possui a exclusividade sobre os alvos, englobando colunas logísticas vitais como `address`, `startTime`, `priority`, `latitude` e `longitude`. Responsável direto pelo acionamento do motor OSRM e Despertar Tático.
+- **`planned_workouts`**: (Atualização V12.2) Detém o detalhamento fracionado de treino. O campo JSONB `details` isola as modalidades (`corrida`, `academia`, `bike`, `restDetails`). A tabela agora inclui `mesocycle_stage` (fase do ciclo), `macrocycle_target` (prova alvo) e `long_run_performance_log` (JSONB para o Digital Twin de Endurance).
+- **`athletes`**: Inclui `homeLat` e `homeLon` mapeadas em dupla precisão flutuante para assegurar cálculos de geolocalização.
+
+---
+
+## Capítulo 6: Cronjobs e Automações (O Relógio Mestre)
+
+A engrenagem autônoma do KINETIX HUB (V12.2) opera com **Fuso Horário Oficial de São Paulo (UTC-3)** para orquestrar os protocolos militares:
 
 1. **`07:00` (Morning Race Job)**: O sistema analisa o calendário de provas (`races`). Dispara os protocolos táticos D-3 (Saturação de Glicogênio e Clima), D-2 (Arsenal de Géis e Pace Chart) e D-1 (Logística de Combate, Cálculo do Despertar Tático OSRM e Waze).
-2. **`22:00` (Daily Briefing Job)**: Analisa o treino planejado (`plannedWorkouts`) para o dia seguinte e envia o resumo tático, PoP (Probabilidade de Chuva OpenWeatherMap), Arsenal Logístico e Visão do Macrociclo ao Comandante no Telegram.
-3. **`23:30` (Route Recalculation Job)**: Auditoria final do dia (Compliance). Verifica se havia um treino programado para hoje e se ele de fato aconteceu (via telemetria do Strava). Se houver quebra (MISSED), a IA é engatilhada para analisar toda a semana do atleta e propor um Recálculo da Rota ou Cancelamento do evento.
+2. **`14:59` (Domingo - Digital Twin)**: Varredura no Strava pelo longão do dia. Aciona a IA para gerar o `long_run_performance_log` e dispara alerta interativo de feedback no Telegram.
+3. **`15:00` (Domingo - Relatórios)**: Geração do relatório semanal em PDF (WeasyPrint) em 3 camadas, baseado no `mesocycle_stage` (Planilha, Diário de Viagem ou Dossiê de Prova).
+4. **`22:30` (Daily Briefing Job)**: Analisa o treino planejado (`plannedWorkouts`) para o dia seguinte e envia o resumo tático, PoP (Probabilidade de Chuva OpenWeatherMap), Arsenal Logístico e Visão do Macrociclo ao Comandante no Telegram.
+5. **`23:30` (Route Recalculation Job)**: Auditoria final do dia (Compliance). Verifica se havia um treino programado para hoje e se ele de fato aconteceu (via telemetria do Strava). Se houver quebra (MISSED), a IA é engatilhada para analisar toda a semana do atleta e propor um Recálculo da Rota ou Cancelamento do evento.
 
 *NOTA: Todos os cronjobs podem ser forçados instantaneamente pela ABA DE EQUIPAMENTOS no aplicativo Mobile através do Painel de Controle IA.*
 
 ---
 
-## 🛡️ CAPÍTULO 6: Validação de Schema (Telemetria e Provas)
+## Capítulo 7: Endpoints de Força (IronLog)
 
-O banco de dados foi preparado e parametrizado para suportar o motor cognitivo:
-- **`races`**: Possui a exclusividade sobre os alvos, englobando colunas logísticas vitais como `address`, `startTime`, `priority`, `latitude` e `longitude`. Responsável direto pelo acionamento do motor OSRM e Despertar Tático.
-- **`planned_workouts`**: Detém o detalhamento fracionado de treino (suportando texto rico e metadados) nas colunas `warmup`, `cooldown` e `restDetails` para alimentar a planilha no Flutter e as auditorias.
-- **`athletes`**: Inclui `homeLat` e `homeLon` mapeadas em dupla precisão flutuante para assegurar cálculos de geolocalização.
+O módulo do Laboratório expõe rotas restritas para a renderização do IronLog no Frontend Flutter:
+
+- **`GET /api/strength/templates`**: Retorna a relação completa das fichas de treino com o detalhamento de exercícios, séries e repetições (Faz o JOIN de `workout_templates`, `workout_template_items` e `exercise_library`).
+- **`GET /api/strength/templates/:id/exercises`**: Retorna cirurgicamente os exercícios de uma ficha em particular.
+- **`POST /api/strength/log`**: Registra uma nova sessão no Laboratório. Injeta o cabeçalho base em `workout_sessions` e o detalhamento executado de carga e repetição em `strength_logs`.
+- **`GET /api/strength/log/:sessionId/audit`**: Retorna o espelho comparativo da auditoria tática (Planilha Base vs Execução Real).
 
 ---
 
-## 🛠️ CAPÍTULO 7: Scripts Utilitários e Operações Táticas
+## Capítulo 8: Endpoints de Dossiês e Relatórios (PDF Engine)
+
+O motor vetorial expõe relatórios dinâmicos diretamente em *Buffer* binário, consumidos pela `reports_screen.dart`:
+
+- **`GET /api/dossiers`**: Lista os dossiês executivos estáticos/cloud em JSON.
+- **`GET /api/reports/logbook/latest`**: Baixa o Diário de Viagem em PDF (Gráfico ACWR).
+- **`GET /api/reports/career/me`**: Baixa o Histórico de Combate em PDF.
+- **`GET /api/reports/race/next`**: Baixa o Prontuário de Missão P1 (Checklist & Smart Pace).
+- **`GET /api/reports/cardio/current`**: Baixa o Raio-X Cardiovascular do Mês em PDF.
+- **`GET /api/reports/strength-audit/:sessionId`**: Baixa a auditoria rigorosa de um treino do IronLog.
+
+---
+
+## Capítulo 9: Scripts Utilitários e Operações Táticas
 
 - **`seedBioimpedance.ts`**: Ferramenta de linha de comando (`src/scripts`) para fazer o parse e a ingestão do histórico clínico do atleta. O script é desenhado para ignorar metadados irregulares das exportações da app OKOK e injetar as leituras em massa de forma segura na tabela `bioimpedance_logs`.
+
+---
+
+## Capítulo 10: Variáveis de Ambiente e Segurança (.env)
+
+As chaves de sistema garantem a segurança e conectividade do motor. **Nunca insira valores reais aqui.**
+
+- **`DATABASE_URL`**: String de conexão ao banco de dados PostgreSQL (Neon DB).
+- **`PORT`**: Porta operacional do backend Hono.
+- **`GEMINI_API_KEY`**: Chave do Google AI Studio para instanciar o *Head Coach*.
+- **`STRAVA_CLIENT_ID`**: ID numérico fornecido pelo painel do desenvolvedor do Strava.
+- **`STRAVA_CLIENT_SECRET`**: Segredo para troca de tokens com a API do Strava.
+- **`STRAVA_REDIRECT_URI`**: URL de retorno pós-autenticação OAuth.
+- **`STRAVA_VERIFY_TOKEN`**: String manual para validar o aperto de mãos na criação do Webhook.
+- **`TELEGRAM_BOT_TOKEN`**: Token do @BotFather para disparar o Briefing Diário e Análises.
+- **`TELEGRAM_CHAT_ID`**: ID do canal/grupo focado entre o Atleta e o Sistema.
+- **`OPENWEATHER_API_KEY`**: Chave de telemetria climática (Pacing/Temperatura).
+- **`FIREBASE_PROJECT_ID`**: Variável do Middleware de Autenticação (App <-> Hono).
+
+> **🚨 ALERTA DE SEGURANÇA (AUDIENCE MISMATCH):**
+> O `FIREBASE_PROJECT_ID` do Backend (e sua respectiva *Service Account JSON*) **DEVE ser estritamente igual** ao `projectId` configurado no Frontend (`lib/firebase_options.dart`). 
+> Divergências entre projetos (ex: App a gerar JWT em `kinetix-hub` e Hono a validar em `danielprocoach`) causarão o erro bloqueante de `incorrect "aud" (audience) claim` e a API retornará 401 Unauthorized.

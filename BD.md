@@ -38,8 +38,11 @@ Armazena os treinos planejados do macrociclo (importados por JSON ou IA).
 - `date`: Timestamp (Not Null)
 - `activityType`: Text (Not Null - ex: RUN, BIKE, STRENGTH)
 - `title`: Text (Not Null)
-- `details`: JSONB (Armazena distâncias, pace alvo, etc)
+- `details`: JSONB (Estrutura V12.2: `{ restDetails, corrida, academia, bike }`. A chave genérica `description` foi permanentemente eliminada em favor do isolamento estrutural paramétrico de modalidades).
 - `isImported`: Boolean (Default: true)
+- `mesocycleStage`: Integer (Fase do ciclo: 1=Base, 2=Carga, 3=Pico, 4=Deload/Taper)
+- `macrocycleTarget`: Text (Nome da prova alvo do ciclo)
+- `longRunPerformanceLog`: JSONB (Prontuário do Digital Twin de Endurance, projetado nativamente via `fl_chart` no Flutter).
 
 ### 4. `workout_sessions` (Diário de Bordo Realizado)
 Treinos efetivamente concluídos (importados do Strava ou logados manualmente).
