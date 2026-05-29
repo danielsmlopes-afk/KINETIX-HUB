@@ -3,6 +3,9 @@ import { reportController } from '../controllers/reportController';
 
 export const reportRoutes = new Hono();
 
+// Listagem dinâmica de todos os dossiês disponíveis
+reportRoutes.get('/', reportController.listReports);
+
 // Endpoints dinâmicos consumidos diretamente pelo "reports_screen.dart" (Motor Vetorial)
 reportRoutes.get('/logbook/:cycleId', reportController.downloadLogbook);
 reportRoutes.get('/career/me', reportController.downloadCareerHistory);
