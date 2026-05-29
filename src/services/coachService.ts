@@ -15,6 +15,17 @@ function parsePaceToSeconds(paceStr: string): number {
   return 0;
 }
 
+/**
+ * DTO para dados de corrida do Strava já processados e prontos para exibição.
+ */
+export interface StravaRunData {
+  id: number;
+  name: string;
+  distanceKm: number;
+  paceStr: string;
+  elevationGain: number;
+}
+
 export const coachService = {
   /**
    * Auditoria Pós-Treino via Strava (Protocolo Esteira Calibrada V2)
@@ -81,5 +92,15 @@ export const coachService = {
     console.log(`[Coach Auditor] Workout ID: ${plannedWorkoutId} | Status: ${complianceStatus} | Info: ${feedback}`);
 
     return { complianceStatus, feedback };
+  },
+
+  /**
+   * Atualiza o status de compliance de um treino manualmente.
+   */
+  async updateComplianceStatus(workoutId: string, status: 'VALIDATED' | 'MISSED' | 'COMPLETED_NOT_VALIDATED') {
+    await db.update(plannedWorkouts)
+      .set({ complianceStatus: status })
+      .where(eq(plannedWorkouts.id, workoutId));
+    console.log(`[Coach Manual] Compliance status for workout ${workoutId} updated to ${status}.`);
   }
 };
