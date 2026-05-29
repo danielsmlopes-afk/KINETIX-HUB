@@ -3,6 +3,9 @@ import { env } from '@/config/env';
 import { coachService } from '@/services/coachService';
 import { workoutService } from '@/services/workoutService';
 import { athleteRepository } from '@/repositories/athleteRepository';
+import { db } from '@/db';
+import { plannedWorkouts } from '@/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 
 type StravaWebhookPayload = {
   'hub.mode'?: string;
@@ -98,29 +101,40 @@ export const stravaController = {
     const paceMins = Math.floor((movingTimeSeconds / 60) / distanceKm);
     const paceSecs = Math.floor(((movingTimeSeconds / 60) / distanceKm % 1) * 60).toString().padStart(2, '0');
 
-        // Verifica presença de traçado GPS e flag de ambiente indoor (trainer)
-        const mapData = activity.map as { summary_polyline?: string } | undefined;
-        const hasGps = Boolean(mapData && mapData.summary_polyline);
-        const isTrainer = Boolean(activity.trainer);
-        
-        // Capturando Laps (parciais da esteira ou autolaps)
-        const laps = Array.isArray(activity.laps) 
-          ? activity.laps.map((lap: any) => ({
-              distanceMeters: Number(lap.distance || 0),
-              movingTimeSeconds: Number(lap.moving_time || 0)
-            }))
-          : undefined;
+    const spDateStr = activityDate.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    
+    const plannedList = await db.select().from(plannedWorkouts).where(
+      and(
+        eq(plannedWorkouts.athleteId, athlete.id),
+        sql`DATE(${plannedWorkouts.date}) = ${spDateStr}`
+      )
+    );
 
-        await coachService.analyzeRunActivity({ 
-          id: activityId, 
-          name: String(activity.name), 
-          distanceKm, 
-          movingTimeSeconds, 
-          paceStr: `${paceMins}:${paceSecs}`, 
-          elevationGain: Number(activity.total_elevation_gain || 0),
-          hasGps,
-          isTrainer,
-          laps
-        });
+    const plannedRun = plannedList.find(p => p.activityType === 'RUN' || p.activityType === 'RUN_INTERVAL');
+
+    if (!plannedRun) {
+      console.log(`[Strava] Nenhuma corrida planejada encontrada para ${spDateStr}. Atividade registrada como Treino Livre.`);
+      return;
+    }
+
+    const details = plannedRun.details as any;
+    let targetDistanceKm = 0;
+    let targetPaceStr = '';
+
+    if (details && typeof details.corrida === 'string') {
+      const distMatch = details.corrida.match(/([\d.,]+)\s*km/i);
+      if (distMatch) targetDistanceKm = parseFloat(distMatch[1].replace(',', '.'));
+      
+      const paceMatch = details.corrida.match(/@\s*(\d{1,2}:\d{2})/);
+      if (paceMatch) targetPaceStr = paceMatch[1];
+    }
+
+    // Delegação para o novo Protocolo de Esteira Calibrada (V2)
+    await coachService.auditWorkout(
+      activity as any,
+      plannedRun.id,
+      targetDistanceKm,
+      targetPaceStr
+    );
   }
 };

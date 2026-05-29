@@ -1,159 +1,85 @@
+import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { athletes, plannedWorkouts } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
-import { env } from '@/config/env';
-import { telegramMessageService } from '@/services/telegramMessageService';
-import { validateTreadmillIntervals } from '@/services/treadmillProtocol';
+import { plannedWorkouts } from '@/db/schema';
+import { StravaActivity } from '@/services/stravaService';
 
-export type StravaRunData = {
-  id: number;
-  name: string;
-  distanceKm: number;
-  movingTimeSeconds: number;
-  paceStr: string;
-  elevationGain: number;
-  hasGps?: boolean;
-  isTrainer?: boolean;
-  laps?: Array<{ distanceMeters: number; movingTimeSeconds: number }>;
-  startDateLocal?: string;
-};
+/**
+ * Utilitário: Converte pace formatado (ex: "07:10") para segundos totais.
+ */
+function parsePaceToSeconds(paceStr: string): number {
+  if (!paceStr) return 0;
+  const match = paceStr.match(/(\d+):(\d{2})/);
+  if (match) {
+    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+  }
+  return 0;
+}
 
 export const coachService = {
-  async analyzeRunActivity(stravaData: StravaRunData): Promise<void> {
-    try {
-      console.log(`[Coach IA] Iniciando análise paramétrica para: ${stravaData.name}`);
-      
-      const athleteList = await db.select().from(athletes).limit(1);
-      if (athleteList.length === 0) return;
-      const athlete = athleteList[0];
+  /**
+   * Auditoria Pós-Treino via Strava (Protocolo Esteira Calibrada V2)
+   * Avalia a distância universal e adapta a malha de Pace perante o cenário Indoor vs Outdoor.
+   */
+  async auditWorkout(
+    activity: StravaActivity,
+    plannedWorkoutId: string,
+    targetDistanceKm: number,
+    targetPaceStr: string
+  ) {
+    let complianceStatus = 'VALIDATED';
+    let feedback = '';
 
-      // Identifica e trata a data vinda da telemetria garantindo o match estrito de YYYY-MM-DD
-      const activityDateStr = stravaData.startDateLocal 
-        ? stravaData.startDateLocal.split('T')[0] 
-        : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const isIndoor = activity.trainer === true || 
+                     activity.type === 'VirtualRun' || 
+                     activity.type === 'IndoorRun';
+                     
+    const actualDistanceKm = activity.distance / 1000;
+    const actualPaceSeconds = actualDistanceKm > 0 ? (activity.moving_time / actualDistanceKm) : 0;
 
-      const planned = await db.select()
-        .from(plannedWorkouts)
-        .where(
-          and(
-            eq(plannedWorkouts.athleteId, athlete.id),
-            eq(plannedWorkouts.activityType, 'RUN'),
-            sql`DATE(${plannedWorkouts.date}) = ${activityDateStr}`
-          )
-        ).limit(1);
-
-      let targetDistance = 'Não especificado (Treino Livre)';
-      let targetPace = 'Livre';
-      let plannedWarmup = 'Não especificado';
-      let plannedCooldown = 'Não especificado';
-      let plannedRest = '';
-      let plannedIntervals: Array<{ distanceMeters: number; speedKmh: number }> | undefined;
-      let promptDetails = '';
-
-      if (planned.length > 0) {
-        const details = (planned[0].details as Record<string, unknown>) || {};
-        promptDetails = JSON.stringify(details);
-        const subtitle = String(details.subtitle || '');
-        const distMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km/i);
-        if (distMatch) targetDistance = `${distMatch[1]} km`;
-        
-        const paceMatch = subtitle.match(/(\d{1,2}:\d{2})/);
-        if (paceMatch) targetPace = `${paceMatch[1]} min/km`;
-        
-        if (planned[0].warmup) plannedWarmup = planned[0].warmup;
-        if (planned[0].cooldown) plannedCooldown = planned[0].cooldown;
-        if (details.restDetails) plannedRest = String(details.restDetails);
-        if (Array.isArray(details.intervals)) {
-          plannedIntervals = details.intervals as Array<{ distanceMeters: number; speedKmh: number }>;
-        }
-        
-        // --- MOTOR DE VALIDAÇÃO DE COMPLIANCE (RUA VS. ESTEIRA) ---
-        let complianceStatus = 'COMPLETED_NOT_VALIDATED';
-        let targetDistVal = 0;
-        let targetPaceSecs = 0;
-        
-        if (targetDistance !== 'Não especificado (Treino Livre)') {
-          targetDistVal = parseFloat(targetDistance.replace(' km', '').replace(',', '.'));
-        }
-        if (targetPace !== 'Livre') {
-          const [m, s] = targetPace.replace(' min/km', '').split(':').map(Number);
-          targetPaceSecs = (m * 60) + (s || 0);
-        }
-
-        if (stravaData.isTrainer || stravaData.hasGps === false) {
-          // REGRA INDOOR: TREADMILL PROTOCOL
-          const isValid = validateTreadmillIntervals(
-            { 
-              targetDistanceKm: targetDistVal, 
-              targetPace: targetPace,
-              restDetails: plannedRest,
-              intervals: plannedIntervals
-            },
-            { distanceKm: stravaData.distanceKm, movingTimeSeconds: stravaData.movingTimeSeconds, laps: stravaData.laps }
-          );
-          complianceStatus = isValid ? 'VALIDATED' : 'COMPLETED_NOT_VALIDATED';
-        } else {
-          // REGRA OUTDOOR: RUA/GPS
-          const isVolumeValid = targetDistVal > 0 
-            ? (stravaData.distanceKm >= targetDistVal * 0.97 && stravaData.distanceKm <= targetDistVal * 1.03) 
-            : true;
-            
-          let isIntensityValid = true;
-          if (targetPaceSecs > 0) {
-            const [am, as] = stravaData.paceStr.split(':').map(Number);
-            isIntensityValid = Math.abs((am * 60 + (as || 0)) - targetPaceSecs) <= 15;
-          }
-          complianceStatus = (isVolumeValid && isIntensityValid) ? 'VALIDATED' : 'COMPLETED_NOT_VALIDATED';
-        }
-
-        console.log(`[VALIDATION_ENGINE]: Workout ${planned[0].id} marked as ${complianceStatus}`);
-        await db.update(plannedWorkouts).set({ complianceStatus }).where(eq(plannedWorkouts.id, planned[0].id));
-      }
-
-      const prompt = `Você é o Head Coach IA do sistema BioMedal V11. O atleta está em preparação para a prova P1: Nike SP City 21K (meta: 2:18:00 a 2:28:00, pace 6:32 a 7:00/km).
-
-Dados da Corrida Realizada (${stravaData.name}):
-- Distância Real: ${stravaData.distanceKm} km
-- Pace Médio Real: ${stravaData.paceStr} min/km
-- Altimetria Acumulada: ${stravaData.elevationGain} m
-
-Dados Planejados para Hoje (${activityDateStr}):
-- Distância Alvo: ${targetDistance}
-- Pace Alvo: ${targetPace}
-- Aquecimento Sugerido: ${plannedWarmup}
-- Desaquecimento Sugerido: ${plannedCooldown}
-- Detalhes Estruturais (V11.1): ${promptDetails}
-
-Você deve avaliar o pace real do atleta EXCLUSIVAMENTE contra a meta descrita no campo 'corrida' do dia. Se a prescrição for uma 'Corrida Leve' ou 'Regenerativa', é TERMINANTEMENTE PROIBIDO cobrar o ritmo de prova alvo (ex: P1 6:32-7:00). Elogie a contenção de ritmo. Só classifique como 'Treino Livre' se o payload JSON do plano do dia for explicitamente vazio ou não encontrado.
-
-Gere um relatório analítico curto, direto e militar (máximo 3 parágrafos) avaliando:
-1. A precisão do ritmo e do volume em relação ao objetivo do dia, avaliando se os trechos de aquecimento e desaquecimento propostos parecem ter sido englobados no esforço total.
-2. O impacto da altimetria no desgaste articular e carga interna.
-3. O nível de prontidão para suportar o ritmo da prova P1 nas próximas semanas.`;
-
-      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
-      const data = await geminiRes.json() as Record<string, any>;
-      const aiAnalysis = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Análise indisponível no momento.';
-
-      await telegramMessageService.sendCoachFeedback(stravaData, aiAnalysis);
-    } catch (error) { console.error('❌ [Coach IA] Erro ao analisar atividade:', error); }
-  },
-
-  async updateComplianceStatus(workoutId: string, status: 'VALIDATED' | 'MISSED' | 'COMPLETED_NOT_VALIDATED'): Promise<void> {
-    try {
-      const result = await db.update(plannedWorkouts)
-        .set({ complianceStatus: status })
-        .where(eq(plannedWorkouts.id, workoutId))
-        .returning({ id: plannedWorkouts.id });
-
-      if (result.length === 0) {
-        throw new Error(`Treino com ID ${workoutId} não encontrado.`);
-      }
-
-      console.log(`[MANUAL_OVERRIDE]: Workout ${workoutId} compliance forced to ${status}`);
-    } catch (error) {
-      console.error(`❌ [Coach IA] Erro ao atualizar status de compliance:`, error);
-      throw error;
+    // 1. REGRA DE DISTÂNCIA UNIVERSAL (RUA E ESTEIRA)
+    const minDistanceAllowed = targetDistanceKm * 0.95; // Queda tolerável máxima de 5%
+    if (actualDistanceKm < minDistanceAllowed) {
+      complianceStatus = 'PARTIAL';
+      feedback = `Distância abaixo da meta. Realizou ${actualDistanceKm.toFixed(2)}km de ${targetDistanceKm}km.`;
     }
+
+    // 2. REGRA DE PACE (RUA VS ESTEIRA)
+    const targetPaceSeconds = parsePaceToSeconds(targetPaceStr);
+
+    if (isIndoor) {
+      // CENÁRIO B: Esteira / Indoor
+      if (complianceStatus === 'VALIDATED') {
+        feedback = "Atividade Indoor Detectada: Distância calibrada aceita. Auditoria estrita de Pace suspensa devido à dinâmica da esteira.";
+      }
+    } else {
+      // CENÁRIO A: Rua / Outdoor
+      if (complianceStatus === 'VALIDATED' && targetPaceSeconds > 0) {
+        const lowerBound = targetPaceSeconds - 10;
+        const upperBound = targetPaceSeconds + 10;
+
+        if (actualPaceSeconds < lowerBound) {
+          complianceStatus = 'PARTIAL';
+          feedback = "Ritmo forte demais. Risco de fadiga residual.";
+        } else if (actualPaceSeconds > upperBound) {
+          complianceStatus = 'PARTIAL';
+          feedback = "Ritmo lento demais.";
+        } else {
+          feedback = "Ritmo de prova validado com precisão militar.";
+        }
+      }
+    }
+
+    // Persiste o resultado tático na planilha do atleta
+    await db.update(plannedWorkouts)
+      .set({ 
+        complianceStatus,
+        // @ts-ignore - Salva a narrativa de auditoria, se suportada
+        complianceFeedback: feedback 
+      })
+      .where(eq(plannedWorkouts.id, plannedWorkoutId));
+
+    console.log(`[Coach Auditor] Workout ID: ${plannedWorkoutId} | Status: ${complianceStatus} | Info: ${feedback}`);
+
+    return { complianceStatus, feedback };
   }
 };

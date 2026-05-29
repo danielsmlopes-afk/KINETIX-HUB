@@ -8,7 +8,7 @@ O aplicativo móvel KINETIX (Flutter) é construído sob uma arquitetura limpa e
 
 - **Presentation (UI)**: Responsável por Widgets, Telas e Gerenciamento de Estado reativo (Bloc/Cubit ou Provider/Riverpod). Consome os casos de uso de forma passiva para reagir e exibir estados.
 - **Domain**: Contém Entidades de negócio puras (ex: `WorkoutEntity`) e Use Cases (Regras de negócio táticas). Totalmente agnóstico de bibliotecas e frameworks externos, o coração lógico do sistema.
-- **Data**: Responsável pela infraestrutura de comunicação física. Contém Models (Data Transfer Objects com métodos vitais como `fromJson` e `toJson`), Repositories (orquestradores de dados) e Data Sources (a conexão HTTP bruta com a API do Hono usando o `api_client.dart`).
+- **Data**: Responsável pela infraestrutura de comunicação física. Contém Models (Data Transfer Objects com métodos vitais como `fromJson` e `toJson`), Repositories (orquestradores de dados) e Data Sources (a conexão HTTP bruta com a API do Hono usando o `api_client.dart`). Em conformidade estrita com o backend em português, o decodificador HTTP obriga a passagem `json.decode(utf8.decode(response.bodyBytes))` para prevenir quebras de encoding UTF-8 (Regra do Data Binding Absoluto).
 
 ## 2. 🗂️ Mapeamento de Features Existentes
 
@@ -19,6 +19,7 @@ O ecossistema móvel reflete perfeitamente as operações de retaguarda do Backe
 - **`features/dashboard/`**: Painel central de controle (`DashboardScreen`). Exibe o status de Compliance diário, resumos de leitura da Bioimpedância, métricas acumuladas (ACWR) e a visão cirúrgica dos próximos alvos diários. Engata as implementações de telemetria visual com o pacote nativo `fl_chart` para renderizar tendências de Volume e Zonas Cardíacas (Z1 a Z5), além de exibir dinamicamente o progresso do Macrociclo (Barra de Progresso) para as provas P1 no `UpcomingRacesCard`.
 - **`features/equipment/` (Arsenal)**: A aba de Equipamentos. Permite rastrear o desgaste logístico de material bélico (Vida útil dos tênis - limite de 800km). Abriga também o estratégico **Painel de Controle IA** (permitindo a injeção nativa de eventos para forçar a execução de Cronjobs fora do fuso-horário padrão do servidor, como o gatilho instantâneo na rota `/debug/trigger-weekly-report` para disparar a geração do PDF Dominical).
 - **`features/inventory/`**: Tela de controle de insumos e balística nutricional. Mostra o estoque físico de géis e cápsulas de sal, disparando métricas visuais se o contingente for insuficiente para os próximos longões/provas.
+- **`features/dossiers/`**: Tela (`reports_screen.dart`) focada no download vetorial assíncrono. Consome as URLs reais da API Hono via `url_launcher`.
 
 ## 3. 🔌 Compliance de Consumo da API V11.1 (O Objeto Workout)
 
@@ -31,5 +32,9 @@ O Motor Cognitivo no Backend atualizou a estrutura da `planned_workouts`, mapean
   - **`academia`**: Se a chave `academia` não for nula, a UI instancia a row de Força. Ativa o ícone de haltere e renderiza a especificação tática isolada.
   - **`bike`**: Se a chave `bike` não for nula, a UI constrói a row de ciclismo evidenciando os tempos de Giro Livre indolor.
 
-**Impacto no Híbrido (`UpcomingWorkoutsCard`)**:
-Essa segregação de chaves garante *Glanceability*. O App consegue empilhar os blocos e usar o `ExpansionTile` do Flutter de maneira atômica, desenhando blocos mistos sem a necessidade de sujas expressões regulares (Regex). Cada modalidade é um componente fechado e seguro. O card expandido agora gerencia perfeitamente dados de `warmup`, `cooldown` e `restDetails`. A telemetria gráfica foi firmada utilizando a biblioteca nativa `fl_chart`.
+**Impacto no Híbrido (`UpcomingWorkoutsCard` e Padrão Checklist / Task-Based UI)**:
+Ocultamos permanentemente o antigo campo genérico de `title` e adotamos o padrão **Task-Based UI / Checklist Modular**. O App agora quebra um mesmo dia de treino em *blocos atômicos* renderizados dinamicamente:
+- O `UpcomingWorkoutsCard` foi desmembrado, iterando as chaves isoladas e utilizando componentes independentes (`RunWorkoutBlock`, `StrengthWorkoutBlock`, `BikeWorkoutBlock`).
+- **Bloco Corrida**: Encapsula as metas de corrida e renderiza de forma condicional metadados como `warmup`, `restDetails` e `cooldown` (com fonte menor/cinza). Ele apresenta também um ícone reativo e read-only no final (trailing), reagindo estritamente ao `complianceStatus` (`VALIDATED` = check_circle verde, `PARTIAL`/`COMPLETED_NOT_VALIDATED` = warning amarelo, `PENDING`/Nulo = círculo vazio).
+- **Blocos Força/Bike**: São apresentados com `IconButton` no final (trailing), atuando como checklists interativos para o atleta marcar a conclusão de atividades que não dependem do radar Strava.
+A telemetria gráfica foi firmada utilizando a biblioteca nativa `fl_chart`.

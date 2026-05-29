@@ -165,17 +165,14 @@ export const reportController = {
   async listReports(c: Context) {
     try {
       // Relação de Relatórios Disponíveis no Painel
-      const reports = [
-        {
-          id: 'planilha-oficial',
-          title: 'Planilha de Treinos (Macrociclo)',
-          description: 'Dossiê contendo todo o macrociclo agendado (Pace, Distâncias, Força).',
-          date: new Date().toISOString(),
-          type: 'PDF',
-          downloadUrl: '/reports/plan'
-        }
+      const dossiers = [
+        { id: 'logbook', title: 'Diário de Viagem', description: 'Gráfico ACWR', endpoint: '/api/reports/logbook/latest' },
+        { id: 'career', title: 'Histórico de Combate', description: 'Histórico Completo', endpoint: '/api/reports/career/me' },
+        { id: 'race', title: 'Prontuário de Missão P1', description: 'Checklist & Smart Pace', endpoint: '/api/reports/race/next' },
+        { id: 'cardio', title: 'Raio-X Cardiovascular', description: 'Análise do Mês', endpoint: '/api/reports/cardio/current' },
+        { id: 'workout-plan', title: 'Planilha de Treinos', description: 'Macrociclo Atual', endpoint: '/api/reports/plan' }
       ];
-      return c.json({ data: reports }, 200);
+      return c.json({ data: dossiers }, 200);
     } catch (error) {
       console.error('❌ Erro ao listar dossiês:', error);
       return c.json({ error: "Erro interno ao listar relatórios.", code: "LIST_ERR" }, 500);

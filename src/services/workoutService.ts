@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { shoes, workoutSessions, consumables } from '@/db/schema';
+import { shoes, workoutSessions, consumables, plannedWorkouts } from '@/db/schema';
 import { calculatePNL } from '@/services/loadCalculator';
 import { StravaActivity } from '@/services/stravaService';
 import { calculateAndDeductGels } from '@/services/nutritionCalculator';
@@ -42,5 +42,13 @@ export const workoutService = {
         console.log(`📦 Logística Kinetix: ${gelsUsed}x [${gelList[0].name}] debitados do inventário (Treino longo detectado).`);
       }
     }
+  },
+
+  async validateManualWorkout(workoutId: string, modality: string) {
+    // Marca o registro do plano diretamente como VALIDATED
+    await db.update(plannedWorkouts)
+      .set({ complianceStatus: 'VALIDATED' })
+      .where(eq(plannedWorkouts.id, workoutId));
+    console.log(`✅ [Manual Validation] Treino ${workoutId} (Modalidade: ${modality}) chancelado manualmente.`);
   }
 };

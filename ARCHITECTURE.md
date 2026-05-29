@@ -43,9 +43,10 @@ O KINETIX HUB opera com **Fuso Horário Oficial Blindado em América/Sao_Paulo (
 ### Status de Compliance e Zonas de Treinamento
 Os treinos e atividades passam por nossa Engine de Validação e são persistidos estritamente sob as seguintes flags:
 - **`VALIDATED`**: Treino realizado rigorosamente dentro da planilha e metas traçadas.
-- **`COMPLETED_NOT_VALIDATED`**: Atleta treinou, mas o volume ou ritmo divergiram (tolerância de +/- 3% e 15s) ou houve falha no protocolo de *Laps* (Esteira).
+- **`PARTIAL` / `COMPLETED_NOT_VALIDATED`**: Atleta treinou, mas a métrica de volume ou ritmo divergiram.
 - **`MISSED`**: Treino não detectado na telemetria e marcado como perdido/faltante.
 - **Regra de Ouro da Auditoria de Pace**: A IA é proibida de aplicar a régua de "Ritmo de Prova" universalmente, devendo respeitar a tipologia do treino (Tiros, Base, Longão, Regenerativo) extraída do banco de dados e repassada via JSON.
+- **Protocolo de Esteira Calibrada (V2)**: A auditoria divide o monitoramento entre Rua e Esteira. **Distância Universal:** Deve possuir queda máxima tolerável de 5% (se a distância real for < alvo em 5%, a atividade recebe flag `PARTIAL`). O atleta calibra o relógio na máquina. **Cenário A (Rua):** Janela estrita de Pace de ± 10s. Fora disso, recebe `PARTIAL` e advertência ("Ritmo forte demais. Risco de fadiga residual" ou "lento demais"). **Cenário B (Esteira/Indoor):** Disparado quando `trainer: true` ou `VirtualRun`/`IndoorRun`. Se a distância universal foi suprida, o motor suspende a auditoria restrita de Pace e sela a avaliação como `VALIDATED`, emitindo o parecer: "Atividade Indoor Detectada: Distância calibrada aceita. Auditoria estrita de Pace suspensa devido à dinâmica da esteira."
 - **Zonas de Esforço**: Parametrizadas taticamente de Z1 a Z5 (Regenerativo ao Anaeróbico Máximo) balizando o motor de *Pacing*.
 
 ### Funcionalidades Ativas

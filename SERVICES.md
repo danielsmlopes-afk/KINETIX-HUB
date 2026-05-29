@@ -6,3 +6,6 @@ A extração de datas via `startDateLocal` aplica o cast SQL paramétrico `sql\`
 
 ## Telegram Controller & Bot Interaction
 O `telegramController.ts` agora expande as operações vitais de preenchimento de telemetria manual. Ele é responsável por varrer e aplicar callbacks de teclados inline (ex: Check-in de STRENGTH ou BIKE), atuando diretamente na tabela `planned_workouts` ao marcar a atividade como `VALIDATED`. O controlador parseia os comandos textuais (`/peso`, `/dor`, `/hoje`) transformando mensagens naturais em insert na base de dados (ex: `bioimpedance_logs` e `pending_actions`).
+
+## Workout Controller & Manual Validation
+O `workoutController.ts` fornece o endpoint `POST /api/workouts/validate-manual` para injetar validações táticas manuais na tabela `planned_workouts`, atuando como um checklist interativo assíncrono acionado primariamente pela interface Flutter (modalidades 'academia' e 'bike'). O Controller age estritamente como delegador (roteamento), repassando as lógicas de update ao `workoutService.ts`.

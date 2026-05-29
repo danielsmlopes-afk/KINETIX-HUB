@@ -92,7 +92,18 @@ const generateWorkoutRows = (workouts: PlannedWorkout[]): string => {
   return rows;
 };
 
-const getHtmlTemplate = (title: string, body: string) => `<!DOCTYPE html>
+function getNutritionFooter(daysToTargetRace?: number): string {
+  if (daysToTargetRace !== undefined && daysToTargetRace <= 3) {
+    return `<div style="background-color: #742a2a; color: #e2e8f0; font-weight: bold; text-align: center; padding: 8px; margin-top: 15px;">
+              FOCO NUTRICIONAL: Saturação de Glicogênio (D-${daysToTargetRace})
+            </div>`;
+  }
+  return `<div style="background-color: #2d3748; color: #a0aec0; text-align: center; padding: 8px; margin-top: 15px;">
+            FOCO NUTRICIONAL: Manutenção e Hidratação Padrão
+          </div>`;
+}
+
+const getHtmlTemplate = (title: string, body: string, footer: string = '') => `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -152,10 +163,11 @@ const getHtmlTemplate = (title: string, body: string) => `<!DOCTYPE html>
     <div class="telemetry-cell"><div class="telemetry-label">TRAVA</div><div class="telemetry-value">SEG / SEX OFF</div></div>
   </div>
   ${body}
+  ${footer}
 </body>
 </html>`;
 
-const generateWeeklyPlanHtml = (workouts: PlannedWorkout[]): string => {
+const generateWeeklyPlanHtml = (workouts: PlannedWorkout[], footer: string = ''): string => {
   const rows = generateWorkoutRows(workouts);
   const body = `
   <table class="workouts-table">
@@ -163,10 +175,10 @@ const generateWeeklyPlanHtml = (workouts: PlannedWorkout[]): string => {
     <tbody>${rows}</tbody>
   </table>
   `;
-  return getHtmlTemplate('Planilha Tática Semanal', body);
+  return getHtmlTemplate('Planilha Tática Semanal', body, footer);
 };
 
-const generateAcwrReportHtml = (workouts: PlannedWorkout[]): string => {
+const generateAcwrReportHtml = (workouts: PlannedWorkout[], footer: string = ''): string => {
   const body = `
     <div class="telemetry-card">
       <div class="telemetry-cell" style="width: 100%; border: none; text-align: left;">
@@ -176,10 +188,10 @@ const generateAcwrReportHtml = (workouts: PlannedWorkout[]): string => {
     </div>
     <p>Placeholder para o gráfico vetorial de ACWR (Carga Aguda vs. Crônica) e resumo da semana de volume reduzido.</p>
   `;
-  return getHtmlTemplate('Diário de Viagem - Deload', body);
+  return getHtmlTemplate('Diário de Viagem - Deload', body, footer);
 };
 
-const generateRaceDossierHtml = (workouts: PlannedWorkout[]): string => {
+const generateRaceDossierHtml = (workouts: PlannedWorkout[], footer: string = ''): string => {
   const race = workouts.find(w => w.name?.toLowerCase().includes('prova'));
   const body = `
     <div class="telemetry-card">
@@ -190,7 +202,7 @@ const generateRaceDossierHtml = (workouts: PlannedWorkout[]): string => {
     </div>
     <p>Placeholder para o Dossiê Global de Prova, incluindo Pace Chart, táticas de hidratação, nutrição e logística baseadas no Weather-Pacing Service.</p>
   `;
-  return getHtmlTemplate('Dossiê Global de Prova', body);
+  return getHtmlTemplate('Dossiê Global de Prova', body, footer);
 };
 
 export const generateWorkoutReportHtml = (workouts: PlannedWorkout[]): string => {
@@ -199,14 +211,24 @@ export const generateWorkoutReportHtml = (workouts: PlannedWorkout[]): string =>
   }
 
   const stage = (workouts[0] as any).mesocycleStage || 1;
-  const isRaceWeek = workouts.some(w => w.name?.toLowerCase().includes('prova'));
+  const raceWorkout = workouts.find(w => w.name?.toLowerCase().includes('prova'));
+  const isRaceWeek = !!raceWorkout;
+  
+  let daysToTargetRace: number | undefined;
+  if (isRaceWeek && raceWorkout) {
+    const raceDate = new Date(raceWorkout.date);
+    const today = new Date();
+    daysToTargetRace = Math.max(0, Math.ceil((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+  }
+
+  const nutritionFooter = getNutritionFooter(daysToTargetRace);
 
   if (isRaceWeek) {
-    return generateRaceDossierHtml(workouts); // Cenário C
+    return generateRaceDossierHtml(workouts, nutritionFooter); // Cenário C
   }
   if (stage === 4) {
-    return generateAcwrReportHtml(workouts); // Cenário B
+    return generateAcwrReportHtml(workouts, nutritionFooter); // Cenário B
   }
   
-  return generateWeeklyPlanHtml(workouts); // Cenário A
+  return generateWeeklyPlanHtml(workouts, nutritionFooter); // Cenário A
 };
