@@ -27,6 +27,7 @@ const privateAppRoutes = new Hono();
 privateAppRoutes.use('*', firebaseAuthMiddleware);
 
 privateAppRoutes.get('/athlete/profile', athleteController.getProfile);
+privateAppRoutes.get('/athlete/bioimpedance-history', athleteController.getBioimpedanceHistory);
 privateAppRoutes.get('/athlete/dossier', dossierController.getDossier);
 privateAppRoutes.route('/reports', reportRoutes);
 privateAppRoutes.route('/strength', strengthRoutes);

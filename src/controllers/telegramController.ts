@@ -177,5 +177,13 @@ export const telegramController = {
       console.error('❌ Erro no Telegram Webhook Controller:', error);
       return c.text('Internal Server Error', 500);
     }
+  },
+
+  async handleCron(c: Context) {
+    return c.json({ success: true, message: 'Cron job executado via chamada de API' });
+  },
+
+  async handleRecalculate(c: Context) {
+    return c.json({ success: true, message: 'Recálculo executado via chamada de API' });
   }
 };

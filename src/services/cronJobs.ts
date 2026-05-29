@@ -5,18 +5,39 @@ import { morningRaceService } from '@/services/morningRaceService';
 import { briefingService } from '@/services/briefingService';
 import { coachService } from '@/services/coachService';
 
+export const runMorningRaceJob = async () => {
+  console.log('[Cron] Executando Morning Race Job');
+  try {
+    await morningRaceService.executeMorningRoutines();
+  } catch (error) {
+    console.error('[Cron] Falha no Morning Race Job:', error);
+  }
+};
+
+export const runDailyBriefingJob = async () => {
+  console.log('[Cron] Executando Daily Briefing');
+  try {
+    await briefingService.executeBriefing();
+  } catch (error) {
+    console.error('[Cron] Falha no Daily Briefing:', error);
+  }
+};
+
+export const runRouteRecalculationJob = async () => {
+  console.log('[Cron] Executando Route Recalculation e Fechamento');
+};
+
+export const runWeeklyReportJob = async () => {
+  console.log('[Cron] Geração de Relatórios em PDF');
+};
+
+export const startCronJobs = () => initCronJobs();
+
 export const initCronJobs = () => {
   console.log('⏳ Inicializando Relógio Mestre Biológico do KINETIX HUB...');
 
   // 07:00 - Morning Race Job
-  cron.schedule('0 7 * * *', async () => {
-    console.log('[Cron] Executando Morning Race Job');
-    try {
-      await morningRaceService.executeMorningRoutines();
-    } catch (error) {
-      console.error('[Cron] Falha no Morning Race Job:', error);
-    }
-  }, { timezone: 'America/Sao_Paulo' });
+  cron.schedule('0 7 * * *', runMorningRaceJob, { timezone: 'America/Sao_Paulo' });
 
   // 14:59 (Domingo) - Varredura Longão Digital Twin
   cron.schedule('59 14 * * 0', async () => {
@@ -25,26 +46,13 @@ export const initCronJobs = () => {
   }, { timezone: 'America/Sao_Paulo' });
 
   // 15:00 (Domingo) - Geração de Relatórios e Dossiês
-  cron.schedule('0 15 * * 0', async () => {
-    console.log('[Cron] Geração de Relatórios em PDF');
-    // Acionamento do PDF Generator Service
-  }, { timezone: 'America/Sao_Paulo' });
+  cron.schedule('0 15 * * 0', runWeeklyReportJob, { timezone: 'America/Sao_Paulo' });
 
   // 22:30 - Daily Briefing e Logística
-  cron.schedule('30 22 * * *', async () => {
-    console.log('[Cron] Executando Daily Briefing');
-    try {
-      await briefingService.executeBriefing();
-    } catch (error) {
-      console.error('[Cron] Falha no Daily Briefing:', error);
-    }
-  }, { timezone: 'America/Sao_Paulo' });
+  cron.schedule('30 22 * * *', runDailyBriefingJob, { timezone: 'America/Sao_Paulo' });
 
   // 23:30 - Recálculo de Rotas / Auditoria de Compliance MISSED
-  cron.schedule('30 23 * * *', async () => {
-    console.log('[Cron] Executando Route Recalculation e Fechamento');
-    // Implementação de auditoria tática
-  }, { timezone: 'America/Sao_Paulo' });
+  cron.schedule('30 23 * * *', runRouteRecalculationJob, { timezone: 'America/Sao_Paulo' });
 
   // ----------------------------------------------------------------------
   // NOVOS CRON-JOBS BIOLÓGICOS E LOGÍSTICOS

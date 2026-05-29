@@ -135,5 +135,31 @@ export const athleteController = {
         500
       );
     }
+  },
+
+  async getBioimpedanceHistory(c: Context) {
+    try {
+      const athleteList = await db.select().from(athletes).limit(1);
+      if (athleteList.length === 0) {
+        return c.json({ error: 'Atleta principal não encontrado no sistema.', code: 'NOT_FOUND' }, 404);
+      }
+      const athlete = athleteList[0];
+
+      const bioList = await db.select()
+        .from(bioimpedanceLogs)
+        .where(eq(bioimpedanceLogs.athleteId, athlete.id))
+        .orderBy(asc(bioimpedanceLogs.date));
+
+      const history = bioList.map((bio) => ({
+        weight: bio.weight,
+        fatPercentage: bio.bodyFat,
+        date: bio.date.toISOString(),
+      }));
+
+      return c.json({ data: history }, 200);
+    } catch (error) {
+      console.error('❌ Erro ao buscar histórico:', error);
+      return c.json({ error: 'Erro interno.', code: 'INTERNAL_ERROR' }, 500);
+    }
   }
 };
