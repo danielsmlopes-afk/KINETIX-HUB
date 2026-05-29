@@ -9,6 +9,7 @@
     *   Funcionalidades Ativas
     *   Gestão de Dívida Técnica (Tech Debt)
     *   Próximos Passos
+    *   Motor Clínico e Segurança Biológica
 2.  Capítulo 2: Árvore de Diretórios (Clean Architecture)
 3.  Capítulo 3: Dicionário de Arquivos Principais (Core Files)
 4.  Capítulo 4: Schema do Banco de Dados (Drizzle ORM)
@@ -44,6 +45,7 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 - **`VALIDATED`**: Treino realizado rigorosamente dentro da planilha e metas traçadas.
 - **`COMPLETED_NOT_VALIDATED`**: Atleta treinou, mas o volume ou ritmo divergiram (tolerância de +/- 3% e 15s) ou houve falha no protocolo de *Laps* (Esteira).
 - **`MISSED`**: Treino não detectado na telemetria e marcado como perdido/faltante.
+- **Regra de Ouro da Auditoria de Pace**: A IA é proibida de aplicar a régua de "Ritmo de Prova" universalmente, devendo respeitar a tipologia do treino (Tiros, Base, Longão, Regenerativo) extraída do banco de dados e repassada via JSON.
 - **Zonas de Esforço**: Parametrizadas taticamente de Z1 a Z5 (Regenerativo ao Anaeróbico Máximo) balizando o motor de *Pacing*.
 
 ### Funcionalidades Ativas
@@ -71,6 +73,9 @@ Os treinos e atividades passam por nossa Engine de Validação e são persistido
 ### Próximos Passos
 - Finalizar a injeção/cruzamento da UI do **Laboratório (Fichas de Força / IronLog)**.
 - Aprimorar relatórios visuais estendendo as lógicas do motor nativo de PDF.
+
+### Motor Clínico e Segurança Biológica
+Uma das missões primordiais do KINETIX HUB é garantir a saúde a longo prazo. O sistema implementa um **Check-in Articular Diário** (Cron-Job programado) disparado pontualmente às 20h00 pelo Telegram. Ele incentiva o registro ativo de dores através do comando interativo `/dor`, cujo processamento alimenta o banco com alertas preventivos (flag de redução de carga). Adicionalmente, a mecânica manual de `/checkin` (Musculação/Bike) supre a ausência de telemetria de indoor sem GPS, servindo como base sólida de coleta para os algoritmos de prevenção de lesões do *Digital Twin*.
 
 ---
 

@@ -79,6 +79,14 @@ ${escapeMarkdown(aiResponse)}`;
 
     return briefingMarkdown;
   }
+
+  /**
+   * Orquestrador executado pelo CronJob diário
+   */
+  public async executeBriefing(): Promise<void> {
+    console.log('[BriefingService] Executando varredura de briefing diário...');
+    // TODO: Implementar busca do treino do dia seguinte e disparar generateNightlyBriefing
+  }
 }
 
 export const briefingService = new BriefingService();

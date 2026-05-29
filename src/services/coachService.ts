@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { athletes, plannedWorkouts } from '@/db/schema';
-import { eq, and, gte, lt } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { env } from '@/config/env';
 import { telegramMessageService } from '@/services/telegramMessageService';
 import { validateTreadmillIntervals } from '@/services/treadmillProtocol';
@@ -15,6 +15,7 @@ export type StravaRunData = {
   hasGps?: boolean;
   isTrainer?: boolean;
   laps?: Array<{ distanceMeters: number; movingTimeSeconds: number }>;
+  startDateLocal?: string;
 };
 
 export const coachService = {
@@ -26,10 +27,10 @@ export const coachService = {
       if (athleteList.length === 0) return;
       const athlete = athleteList[0];
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      // Identifica e trata a data vinda da telemetria garantindo o match estrito de YYYY-MM-DD
+      const activityDateStr = stravaData.startDateLocal 
+        ? stravaData.startDateLocal.split('T')[0] 
+        : new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 
       const planned = await db.select()
         .from(plannedWorkouts)
@@ -37,8 +38,7 @@ export const coachService = {
           and(
             eq(plannedWorkouts.athleteId, athlete.id),
             eq(plannedWorkouts.activityType, 'RUN'),
-            gte(plannedWorkouts.date, today),
-            lt(plannedWorkouts.date, tomorrow)
+            sql`DATE(${plannedWorkouts.date}) = ${activityDateStr}`
           )
         ).limit(1);
 
@@ -48,9 +48,11 @@ export const coachService = {
       let plannedCooldown = 'Não especificado';
       let plannedRest = '';
       let plannedIntervals: Array<{ distanceMeters: number; speedKmh: number }> | undefined;
+      let promptDetails = '';
 
       if (planned.length > 0) {
         const details = (planned[0].details as Record<string, unknown>) || {};
+        promptDetails = JSON.stringify(details);
         const subtitle = String(details.subtitle || '');
         const distMatch = subtitle.match(/(\d+(?:[.,]\d+)?)\s*km/i);
         if (distMatch) targetDistance = `${distMatch[1]} km`;
@@ -115,11 +117,14 @@ Dados da Corrida Realizada (${stravaData.name}):
 - Pace Médio Real: ${stravaData.paceStr} min/km
 - Altimetria Acumulada: ${stravaData.elevationGain} m
 
-Dados Planejados para Hoje:
+Dados Planejados para Hoje (${activityDateStr}):
 - Distância Alvo: ${targetDistance}
 - Pace Alvo: ${targetPace}
 - Aquecimento Sugerido: ${plannedWarmup}
 - Desaquecimento Sugerido: ${plannedCooldown}
+- Detalhes Estruturais (V11.1): ${promptDetails}
+
+Você deve avaliar o pace real do atleta EXCLUSIVAMENTE contra a meta descrita no campo 'corrida' do dia. Se a prescrição for uma 'Corrida Leve' ou 'Regenerativa', é TERMINANTEMENTE PROIBIDO cobrar o ritmo de prova alvo (ex: P1 6:32-7:00). Elogie a contenção de ritmo. Só classifique como 'Treino Livre' se o payload JSON do plano do dia for explicitamente vazio ou não encontrado.
 
 Gere um relatório analítico curto, direto e militar (máximo 3 parágrafos) avaliando:
 1. A precisão do ritmo e do volume em relação ao objetivo do dia, avaliando se os trechos de aquecimento e desaquecimento propostos parecem ter sido englobados no esforço total.

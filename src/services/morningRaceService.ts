@@ -76,5 +76,13 @@ Tarefa 2 - Nutrição da Véspera: Jantar até às 19h.`;
 
     return `${escapeMarkdown(template)}\n\n🔗 Rota de Aproximação (Waze): Link`;
   }
+
+  /**
+   * Orquestrador executado pelo CronJob matinal
+   */
+  public async executeMorningRoutines(): Promise<void> {
+    console.log('[MorningRaceService] Executando varredura matinal de provas alvo (D-3, D-2, D-1)...');
+    // TODO: Implementar busca de provas nos próximos 3 dias e acionar os protocolos D-3, D-2 e D-1
+  }
 }
 export const morningRaceService = new MorningRaceService();
