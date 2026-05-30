@@ -9,6 +9,8 @@ O aplicativo móvel KINETIX (Flutter) é construído sob uma arquitetura limpa e
 - **Presentation (UI)**: Responsável por Widgets, Telas e Gerenciamento de Estado reativo (Bloc/Cubit ou Provider/Riverpod). Consome os casos de uso de forma passiva para reagir e exibir estados.
 - **Domain**: Contém Entidades de negócio puras (ex: `WorkoutEntity`) e Use Cases (Regras de negócio táticas). Totalmente agnóstico de bibliotecas e frameworks externos, o coração lógico do sistema.
 - **Data**: Responsável pela infraestrutura de comunicação física. Contém Models (Data Transfer Objects como `WorkoutModel` em `workout_model.dart` com parse 100% tipado no `fromJson`), Repositories (orquestradores de dados) e Data Sources (a conexão HTTP bruta com a API do Hono usando o `api_client.dart`). Em conformidade estrita com o backend em português, o decodificador HTTP obriga a passagem `json.decode(utf8.decode(response.bodyBytes))` para prevenir quebras de encoding UTF-8 (Regra do Data Binding Absoluto). A UI é proibida de operar diretamente sobre mapeamentos iterados no formato `dynamic` ou `Map<String, dynamic>`.
+  - **Defesa Contra Meia-Noite Fantasma (Timezone):** O parse de datas em `WorkoutModel` bloqueia ativamente o shift de timezone extraindo estritamente a string `YYYY-MM-DD`, prevenindo que a conversão automática para `.toLocal()` reduza 3 horas (UTC-3) e coloque o treino na noite do dia anterior.
+  - **Defesa de Parser JSONB:** O mapeamento do metadado `details` trata contingências em formato `String` decodificando ativamente com `jsonDecode()`, evitando a corrupção por objetos nulos na camada de Apresentação.
 
 ## 2. 🗂️ Mapeamento de Features Existentes
 

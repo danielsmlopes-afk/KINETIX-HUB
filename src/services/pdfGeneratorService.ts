@@ -116,7 +116,7 @@ export async function generatePhysiologicalXRayPDF(athleteId: string, month: num
       doc.fontSize(16).text('Seção 3: Provas e Competições').moveDown(0.5);
       if (monthRaces.length > 0) {
         monthRaces.forEach((r, idx) => {
-          doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${r.name || r.category} (${r.distance}km) - ${r.date.toLocaleDateString('pt-BR')}`);
+          doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${r.name || r.category} (${r.distance}km) - ${r.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
           doc.fontSize(10).fillColor('#4b5563').text(`   Local: ${r.startLocation} | Clima: ${r.weather || 'N/A'}`);
           if (r.movingTime) {
             const h = Math.floor(r.movingTime / 3600);
@@ -168,7 +168,7 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
     doc.fontSize(20).text('KINETIX HUB - Prontuário de Prova', { align: 'center' }).moveDown();
     doc.fontSize(16).text(`${race.name || race.category} - ${race.distance}km`, { align: 'center' }).moveDown();
     
-    doc.fontSize(12).text(`Data: ${race.date.toLocaleDateString('pt-BR')}`);
+    doc.fontSize(12).text(`Data: ${race.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
     doc.text(`Local da Largada: ${race.startLocation}`);
     if (race.weather) {
       doc.text(`Clima na Largada: ${race.weather}`);
@@ -247,7 +247,7 @@ export async function generateLogbookPDF(athleteId: string, startDate: Date, end
     doc.on('error', reject);
 
     doc.fontSize(20).text('KINETIX HUB - Logbook Tático', { align: 'center' }).moveDown();
-    doc.fontSize(14).text(`Período de Avaliação: ${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`, { align: 'center' }).moveDown(2);
+    doc.fontSize(14).text(`Período de Avaliação: ${startDate.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} a ${endDate.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`, { align: 'center' }).moveDown(2);
 
     // GRÁFICO VETORIAL DE ADERÊNCIA (STACKED BAR)
     doc.fontSize(16).fillColor('black').text('Aderência ao Plano (Compliance)').moveDown(1);
@@ -285,7 +285,7 @@ export async function generateLogbookPDF(athleteId: string, startDate: Date, end
     } else {
       desvios.forEach(d => {
         const status = d.complianceStatus || 'MISSED';
-        doc.fontSize(10).fillColor(status === 'MISSED' ? '#ef4444' : '#f59e0b').text(`[${status}] `, { continued: true }).fillColor('black').text(`${d.date.toLocaleDateString('pt-BR')} - ${d.title}`);
+        doc.fontSize(10).fillColor(status === 'MISSED' ? '#ef4444' : '#f59e0b').text(`[${status}] `, { continued: true }).fillColor('black').text(`${d.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} - ${d.title}`);
         doc.moveDown(0.2);
       });
     }
@@ -313,7 +313,7 @@ export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
       doc.fontSize(12).text('Nenhum treino planejado encontrado no banco de dados.');
     } else {
       workouts.forEach((w, idx) => {
-        const dateStr = w.date.toLocaleDateString('pt-BR');
+        const dateStr = w.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         let emoji = '💤';
         if (w.activityType === 'RUN') emoji = '🏃‍♂️';
         else if (w.activityType === 'BIKE') emoji = '🚴‍♂️';
@@ -328,8 +328,13 @@ export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
         doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${dateStr} - ${emoji} ${w.activityType}: ${w.title}${statusBadge}`);
         
         let detailsStr = '';
-        if (w.details && typeof w.details === 'object') {
-          detailsStr = Object.entries(w.details).map(([k, v]) => `${k}: ${v}`).join(' | ');
+        let parsedDetails = w.details;
+        if (typeof parsedDetails === 'string') {
+          try { parsedDetails = JSON.parse(parsedDetails); } catch (e) { console.error('[PDF Engine] Erro de parser JSONB:', e); }
+        }
+        
+        if (parsedDetails && typeof parsedDetails === 'object') {
+          detailsStr = Object.entries(parsedDetails).map(([k, v]) => `${k}: ${v}`).join(' | ');
         }
         
         if (detailsStr) {
@@ -377,12 +382,30 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
         timeStr = [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
       }
 
-      doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${r.date.toLocaleDateString('pt-BR')} - ${r.name || r.category}`);
+      doc.fontSize(12).fillColor('black').text(`${idx + 1}. ${r.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} - ${r.name || r.category}`);
       doc.fontSize(10).fillColor('#4b5563').text(`    Distância: ${r.distance}km | Tempo: ${timeStr} | Local: ${r.startLocation}`);
       if (r.weather) doc.text(`    Clima: ${r.weather}`);
       doc.moveDown(0.5);
     });
 
+    doc.end();
+  });
+}
+
+export async function generateStrengthAuditPDF(sessionId: string): Promise<Buffer> {
+  // TODO: Conectar lógica avançada de Cruzamento IronLog (Planejado vs Realizado)
+  // Retorna documento Base para suprimir erro 404/500 caso a rota seja chamada antecipadamente
+  return new Promise((resolve, reject) => {
+    const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
+    const doc = new Doc({ margin: 50 });
+    const buffers: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => buffers.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).fillColor('black').text('KINETIX HUB - Auditoria de Força (IronLog)', { align: 'center' }).moveDown(2);
+    doc.fontSize(12).text(`Sessão ID: ${sessionId}`);
+    doc.text('Relatório em construção. O Head Coach está calibrando a telemetria de cargas.');
     doc.end();
   });
 }

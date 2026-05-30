@@ -10,6 +10,9 @@ O script de injeção e laboratório `seedLaboratory.ts` utiliza transações ro
 
 Para os exercícios padrão de hipertrofia o esquema utiliza `sets: 3, reps: '10'`.
 
+## Single-Tenant em Provas (races)
+A tabela `races` não utiliza vínculo direto por `athleteId`, operando de forma global/single-tenant na arquitetura base. As provas alvo inseridas pelo sistema (ex: Bot Telegram) recebem obrigatoriamente a flag `isTarget: true`, definindo-as ativamente como prioridade na matriz.
+
 ## Fallbacks Manuais de Auditoria
 A tabela `planned_workouts` pode ter sua coluna `complianceStatus` alterada explicitamente pelo Comandante via UI Mobile, utilizando o serviço `updateComplianceStatus` (`coachService.ts`). Isso possibilita corrigir falhas de tracking do Strava ou de check-in indoor diretamente no banco, injetando manualmente os status `VALIDATED`, `MISSED` ou `COMPLETED_NOT_VALIDATED`.
 

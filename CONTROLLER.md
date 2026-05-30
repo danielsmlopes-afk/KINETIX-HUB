@@ -18,7 +18,7 @@ Orquestra a interação bot/humano (Comandante e Head Coach IA), recebendo input
 
 ### Ingestão Dupla (`/provaalvo`)
 - O controlador opera um mecanismo duplo: se acionado sem parâmetros, devolve as instruções de formatação estrita em `MarkdownV2`.
-- Quando recebe o payload (ex: `/provaalvo 2026-10-12 Maratona P1`), executa a lógica de extração via `String.prototype.split()` e `String.prototype.trim()`, repassando os dados tipados para a IA orquestrar o Macrociclo Dinâmico em `races` e `planned_workouts`.
+- Quando recebe o payload (ex: `/provaalvo Nome da Prova | 26/07/2026 | 21km`), executa a lógica de extração e injeta ativamente os dados na base de dados (`races`) definindo a categoria como `P1` e fixando `isTarget: true`. Não é necessário referenciar o `athleteId` devido ao modelo de escopo único.
 
 ### Callbacks Inline e Teclados de Comando
 - Trata os payloads originários de *Inline Keyboards* (botões no chat).
