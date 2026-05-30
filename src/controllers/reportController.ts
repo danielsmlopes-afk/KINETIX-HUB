@@ -1,12 +1,11 @@
 // Arquivo: src/controllers/reportController.ts
 import { Context } from 'hono';
-import { generatePhysiologicalXRayPDF, generateRaceReportPDF, generateCareerReportPDF, generatePlanPDF } from '@/services/pdfGeneratorService';
+import { generatePhysiologicalXRayPDF, generateRaceReportPDF, generateCareerReportPDF, generatePlanPDF, generateStrengthAuditPDF } from '@/services/pdfGeneratorService';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { generateLogbookPdf } from '../services/pdf/logbookService';
 import { generateCareerHistoryPdf } from '../services/pdf/careerHistoryService';
 import { generateRaceBriefingPdf } from '../services/pdf/raceBriefingService';
 import { cardioEfficiencyService } from '../services/pdf/cardioEfficiencyService';
-import { generateStrengthAuditPdf } from '../services/pdf/strengthAuditService';
 
 export const reportController = {
   async downloadXRay(c: Context) {
@@ -152,12 +151,11 @@ export const reportController = {
   async downloadStrengthAudit(c: Context) {
     try {
       const sessionId = c.req.param('sessionId');
-      const templateId = c.req.query('templateId');
 
-      if (!sessionId || !templateId) {
-        return c.json({ error: "Os parâmetros 'sessionId' e 'templateId' são obrigatórios.", code: "MISSING_PARAMS" }, 400);
+      if (!sessionId) {
+        return c.json({ error: "O parâmetro 'sessionId' é obrigatório.", code: "MISSING_PARAMS" }, 400);
       }
-      const pdfBuffer = await generateStrengthAuditPdf(sessionId, templateId);
+      const pdfBuffer = await generateStrengthAuditPDF(sessionId);
       c.header('Content-Type', 'application/pdf');
       c.header('Content-Disposition', `attachment; filename="auditoria_forca_${sessionId.slice(0,6)}.pdf"`);
       return c.body(new Uint8Array(pdfBuffer));

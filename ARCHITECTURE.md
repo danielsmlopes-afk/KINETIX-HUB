@@ -45,6 +45,7 @@ O KINETIX HUB opera com **Fuso Horário Oficial Blindado em América/Sao_Paulo (
 * **Frontend**: Aplicativo Flutter com **Clean Architecture**, isolando lógicas de Apresentação (UI) das camadas de Domínio e Dados (API), agrupadas por `features` (`spreadsheet`, `dashboard`).
 * **Motor de IA**: Gemini 2.5 Flash / Groq operando a inteligência tática (*Head Coach*).
 * **Integrações**: Strava Webhooks, Telegram Bot API, OpenWeatherMap.
+* **Motor Cartográfico Interno (MapStatic)**: Instância própria operando via Docker que garante a **Soberania Cartográfica** da plataforma. A plotagem de *polylines* nos relatórios em PDF ocorre estritamente dentro da rede interna, sem vazar dados sigilosos de geolocalização do Strava para APIs cartográficas de terceiros.
 
 ### Status de Compliance e Zonas de Treinamento
 

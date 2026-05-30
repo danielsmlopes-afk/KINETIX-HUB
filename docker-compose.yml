@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MAPSTATIC_URL=http://mapstatic:8080/image
+    networks:
+      - kinetix-net
+    depends_on:
+      - mapstatic
+
+  mapstatic:
+    image: stefanocudini/docker-mapstatic
+    ports:
+      - "8080:8080"
+    networks:
+      - kinetix-net
+
+networks:
+  kinetix-net:
+    driver: bridge
