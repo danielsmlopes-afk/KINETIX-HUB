@@ -4,6 +4,8 @@ import { telegramMessageService } from '@/services/telegramMessageService';
 import { morningRaceService } from '@/services/morningRaceService';
 import { briefingService } from '@/services/briefingService';
 import { coachService } from '@/services/coachService';
+import { generateLogbookPdf } from '@/services/pdf/logbookService';
+import { athleteRepository } from '@/repositories/athleteRepository';
 
 export const runMorningRaceJob = async () => {
   console.log('[Cron] Executando Morning Race Job');
@@ -28,7 +30,24 @@ export const runRouteRecalculationJob = async () => {
 };
 
 export const runWeeklyReportJob = async () => {
-  console.log('[Cron] Geração de Relatórios em PDF');
+  console.log('[Cron] Geração de Relatórios em PDF (Dominical)');
+  try {
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    const pdfBuffer = await generateLogbookPdf('Ciclo Ativo');
+    const chatId = Number(env.TELEGRAM_CHAT_ID);
+    
+    await telegramMessageService.sendPdfReport(
+      chatId, 
+      pdfBuffer, 
+      'Diario_de_Viagem.pdf', 
+      '📄 *DIÁRIO DE VIAGEM (LOGBOOK)*\n\nComandante, a operação semanal foi encerrada. Segue em anexo a topografia de Carga Aguda vs Crônica e o balanço do seu Macrociclo.'
+    );
+    console.log('[Cron] Dossiê Dominical enviado com sucesso ao Comandante!');
+  } catch (error) {
+    console.error('[Cron] Falha ao gerar e enviar o relatório semanal:', error);
+  }
 };
 
 export const startCronJobs = () => initCronJobs();

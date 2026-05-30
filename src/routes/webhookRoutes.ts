@@ -8,3 +8,4 @@ webhookRoutes.post('/uptime', webhookController.toggleUptime);
 webhookRoutes.post('/weather-pacing', webhookController.handleWeatherPacing);
 webhookRoutes.post('/performance/acwr', webhookController.handleAcwrAudit);
 webhookRoutes.post('/db-maintenance', webhookController.handleDbMaintenance);
+webhookRoutes.post('/manual-trigger', webhookController.handleManualTrigger);

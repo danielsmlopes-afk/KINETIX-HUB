@@ -9,3 +9,9 @@ O script de injeção e laboratório `seedLaboratory.ts` utiliza transações ro
    - `reps: 'N'`, `notes: '1 minuto de descanso'`
 
 Para os exercícios padrão de hipertrofia o esquema utiliza `sets: 3, reps: '10'`.
+
+## Fallbacks Manuais de Auditoria
+A tabela `planned_workouts` pode ter sua coluna `complianceStatus` alterada explicitamente pelo Comandante via UI Mobile, utilizando o serviço `updateComplianceStatus` (`coachService.ts`). Isso possibilita corrigir falhas de tracking do Strava ou de check-in indoor diretamente no banco, injetando manualmente os status `VALIDATED`, `MISSED` ou `COMPLETED_NOT_VALIDATED`.
+
+## Emissão Nativa de Relatórios (Operação Bypass)
+Os endpoints que emitem binários em Buffer (PDFs) extraídos destas tabelas aceitam validação JWT na string da URL (`?token=`), facilitando requisições sem `Headers` rígidos disparadas pelas WebViews ou visualizadores nativos do Flutter.

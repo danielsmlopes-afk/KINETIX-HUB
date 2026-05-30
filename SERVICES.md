@@ -9,3 +9,10 @@ O `telegramController.ts` agora expande as operações vitais de preenchimento d
 
 ## Workout Controller & Manual Validation
 O `workoutController.ts` fornece o endpoint `POST /api/workouts/validate-manual` para injetar validações táticas manuais na tabela `planned_workouts`, atuando como um checklist interativo assíncrono acionado primariamente pela interface Flutter (modalidades 'academia' e 'bike'). O Controller age estritamente como delegador (roteamento), repassando as lógicas de update ao `workoutService.ts`.
+Ainda no escopo manual, o `coachController.ts` expõe a rota para atualização de status de compliance (`updateCompliance`), invocando o `coachService.updateComplianceStatus(id, status)` para forçar a marcação de treinos como validados, perdidos ou concluídos com ressalvas. Essa abordagem fortalece a robustez do sistema caso falhas externas na telemetria Strava corrompam a auditoria regular.
+
+## Auth Middleware & Autenticação Híbrida
+O `authMiddleware.ts` atua como o portão de segurança do Hono. Para garantir a viabilidade da leitura nativa de PDFs via dispositivos mobile (onde a manipulação de Headers de rede no visualizador pode ser limitada ou inexistente), ele executa a **Operação Bypass**: tenta extrair primeiramente o header `Authorization: Bearer <token>` e, caso não o encontre, faz um fallback seguro extraindo o token estritamente da query string (ex: `c.req.query("token")`).
+
+## Auth Middleware & Autenticação Híbrida
+O `authMiddleware.ts` atua como o portão de segurança do Hono. Para garantir a viabilidade da leitura nativa de PDFs via dispositivos mobile (onde a manipulação de Headers de rede no visualizador pode ser limitada ou inexistente), ele executa a **Operação Bypass**: tenta extrair primeiramente o header `Authorization: Bearer <token>` e, caso não o encontre, faz um fallback seguro extraindo o token estritamente da query string (ex: `c.req.query("token")`).

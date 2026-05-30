@@ -1,9 +1,11 @@
-import { InferSelectModel, eq, desc } from 'drizzle-orm';
+import { InferSelectModel, eq, desc, and, gte, lte } from 'drizzle-orm';
 import { db } from '@/db';
-import { races, athletes, bioimpedanceLogs } from '@/db/schema';
+import { races, athletes, bioimpedanceLogs, cronLogs } from '@/db/schema';
 import { askHeadCoach } from './headCoachService';
 import { getEstimatedTravelTime } from './routingService';
 import { escapeMarkdown } from './briefingService';
+import { telegramMessageService } from './telegramMessageService';
+import { env } from '@/config/env';
 
 type Race = InferSelectModel<typeof races>;
 type Athlete = InferSelectModel<typeof athletes>;
@@ -82,7 +84,43 @@ Tarefa 2 - Nutrição da Véspera: Jantar até às 19h.`;
    */
   public async executeMorningRoutines(): Promise<void> {
     console.log('[MorningRaceService] Executando varredura matinal de provas alvo (D-3, D-2, D-1)...');
-    // TODO: Implementar busca de provas nos próximos 3 dias e acionar os protocolos D-3, D-2 e D-1
+    try {
+      const athleteList = await db.select().from(athletes).limit(1);
+      if (athleteList.length === 0) return;
+      const athlete = athleteList[0];
+
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const today = new Date(`${todayStr}T00:00:00Z`);
+      const limitDate = new Date(today);
+      limitDate.setUTCDate(today.getUTCDate() + 3);
+      limitDate.setUTCHours(23, 59, 59, 999);
+
+      const upcomingRaces = await db.select().from(races).where(
+        and(gte(races.date, today), lte(races.date, limitDate))
+      );
+
+      let protocolsExecuted = 0;
+      for (const race of upcomingRaces) {
+        const rDate = new Date(race.date);
+        rDate.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil((rDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let message = '';
+        if (diffDays === 3) message = await this.processD3(athlete.id, race);
+        else if (diffDays === 2) message = await this.processD2(race);
+        else if (diffDays === 1) message = await this.processD1(athlete, race);
+
+        if (message && env.TELEGRAM_CHAT_ID) {
+          await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), message);
+          protocolsExecuted++;
+        }
+      }
+
+      await db.insert(cronLogs).values({ jobName: 'MORNING_RACE', status: 'SUCCESS', message: `Protocolos disparados: ${protocolsExecuted}` });
+    } catch (error) {
+      console.error('❌ [MorningRaceService] Falha:', error);
+      await db.insert(cronLogs).values({ jobName: 'MORNING_RACE', status: 'FAILED', message: error instanceof Error ? error.message : 'Erro desconhecido' });
+    }
   }
 }
 export const morningRaceService = new MorningRaceService();

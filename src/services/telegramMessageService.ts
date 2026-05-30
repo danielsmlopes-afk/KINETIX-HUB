@@ -30,6 +30,26 @@ async function sendMsg(chatId: number, text: string): Promise<void> {
 }
 
 export const telegramMessageService = {
+  async sendPdfReport(chatId: number, pdfBuffer: Buffer, filename: string, caption: string): Promise<void> {
+    try {
+      console.log(`[Telegram] Enviando documento PDF (${filename}) para o chat ${chatId}...`);
+      const form = new FormData();
+      form.append('chat_id', chatId.toString());
+      form.append('caption', caption);
+      form.append('parse_mode', 'Markdown');
+      // Converte o Buffer em Blob nativo (Suportado no Node.js 18+)
+      const blob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
+      form.append('document', blob, filename);
+
+      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, {
+        method: 'POST',
+        body: form
+      });
+    } catch (error) {
+      console.error('❌ [Telegram] Falha ao enviar o documento PDF:', error);
+    }
+  },
+
   async sendCoachFeedback(stravaData: StravaRunData, aiAnalysis: string): Promise<void> {
     try {
       console.log(`[Telegram] Formatando dossiê de telemetria para a atividade ${stravaData.id}...`);
@@ -89,11 +109,11 @@ export const telegramMessageService = {
     }
 
     if (cmd === '/BRIEFING') {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const tomorrow = new Date(`${todayStr}T00:00:00Z`);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
       const endOfTomorrow = new Date(tomorrow);
-      endOfTomorrow.setHours(23, 59, 59, 999);
+      endOfTomorrow.setUTCHours(23, 59, 59, 999);
 
       const workouts = await db.select().from(plannedWorkouts).where(
         and(

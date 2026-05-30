@@ -3,15 +3,23 @@ import { firebaseAdmin } from '@/config/firebase';
 
 export const firebaseAuthMiddleware = async (c: Context, next: Next) => {
   const authHeader = c.req.header('Authorization');
+  let token = '';
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else {
+    const queryToken = c.req.query('token');
+    if (queryToken) {
+      token = queryToken;
+    }
+  }
+
+  if (!token) {
     return c.json(
       { error: 'Acesso negado. Token não fornecido ou mal formatado.', code: 'UNAUTHORIZED' },
       401
     );
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);

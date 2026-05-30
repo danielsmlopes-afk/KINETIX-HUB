@@ -110,9 +110,11 @@ kinetix_app/
 │   └── features/      # Clean Architecture: Isolamento por Domínio
 │       ├── arsenal/     # Tênis e vida útil
 │       ├── dashboard/   # Hub Central (Hoje, Amanhã, Bioimpedância)
+│       │   ├── bioimpedance_progress_screen.dart # Tela de histórico de evolução clínica e gráficos
 │       │   └── widgets/ # Componentização SOLID (UpcomingWorkoutsCard com ExpansionTile híbrido para Aquecimento/Desaquecimento).
 │       ├── dossiers/    # Relatórios em PDF
-│       │   ├── dossier_panel.dart    # Painel executivo que utiliza url_launcher para downloads de PDF.
+│       │   ├── reports_screen.dart   # Painel executivo que exibe a lista de relatórios.
+│       │   └── pdf_viewer_screen.dart # Renderizador nativo de PDF embutido (SfPdfViewer).
 │       ├── laboratory/  # Fichas de força
 │       └── spreadsheet/ # Planilha tática
 └── pubspec.yaml
@@ -123,23 +125,24 @@ kinetix_app/
 - **`[coachService.ts]`** (`kinetix-api/src/services/coachService.ts`): Cérebro do sistema de auditoria. Analisa os webhooks do Strava cruzando com a planilha para determinar compliance de *volume*, *intensidade*, rua e esteira.
 - **`[macrocycleService.ts]`** (`kinetix-api/src/services/macrocycleService.ts`): Serviço autônomo que intercepta cadastros de provas e gera via Head Coach IA a estrutura tática de um macrociclo dinâmico adaptado às semanas restantes e prioridade (P1/P2/P3), com notificações ao Telegram.
 - **`[reportController.ts]` & `[pdfGeneratorService.ts]`**: Motor Vetorial responsável por gerar PDFs nativos via `pdfkit` (Logbook, Raio-X, Auditoria de Força), encapsulando lógica de primitivas de desenho geométrico para gráficos.
+- **`[cardioEfficiencyService.ts]` & `[careerHistoryService.ts]`**: Sub-motores vetoriais que consomem a telemetria real (Pace, BPM, Histórico de Sessões) do banco, processando trigonometria e plotagem direta via Buffer de memória.
 - **`[dossierController.ts]`**: Controlador executivo que lista relatórios gerados/salvos e fornece as URLs para o `url_launcher` do Flutter.
 - **`[strengthRepository.ts]`** (`kinetix-api/src/repositories/strengthRepository.ts`): Gerencia a persistência das Fichas de Treino e Auditoria (IronLog), isolando lógicas de JOIN entre templates, exercícios e os registros efetivamente realizados na sessão.
 - **`[headCoachService.ts]`** (`kinetix-api/src/services/headCoachService.ts`): Motor Cognitivo (Gemini/IA). Inclui proteção de *Circuit Breaker* e respostas de contingência para evitar gargalos na API do Google.
 - **`[stravaController.ts]`** (`kinetix-api/src/controllers/stravaController.ts`): O Portão de Entrada. Recebe e valida a assinatura dos eventos do Strava, despacha de forma assíncrona (não-bloqueante) a dedução de logística (Géis) e arsenal (Tênis) via `workoutService`, e repassa Laps e Flags para a validação tática do Coach.
 - **`[treadmillProtocol.ts]`** (`kinetix-api/src/services/treadmillProtocol.ts`): Isolamento matemático para validação estrita de atividades indoor (Ignora o GPS, reconstrói parciais via Moving Time e calcula margens dinâmicas de repouso passivo).
 - **`[briefingService.ts]`** (`kinetix-api/src/services/briefingService.ts`): Orquestrador do Briefing Diário Noturno. Aplica as regras de ouro logísticas (Gel vs Hidratação) montando o payload em MarkdownV2 rígido.
-- **`[morningRaceService.ts]`** (`kinetix-api/src/services/morningRaceService.ts`): Motor Pré-Prova Matinal. Executa os protocolos de contingência D-3 (Saturação de Glicogênio), D-2 (Pace Chart e Géis) e D-1 (Checklist de Véspera).
+- **`[morningRaceService.ts]`** (`kinetix-api/src/services/morningRaceService.ts`): Motor Pré-Prova Matinal. Orquestra ativamente a varredura dos próximos 3 dias, aciona os protocolos logísticos D-3, D-2 e D-1 (via OSRM) e audita o status da operação na tabela `cron_logs`.
 - **`[cronJobs.ts]`** (`kinetix-api/src/services/cronJobs.ts`): Relógio Mestre do sistema, responsável por inicializar as varreduras diárias com auxílio da Inteligência Artificial.
 - **`[schema.ts]`** (`kinetix-api/src/db/schema.ts`): A espinha dorsal dos dados. Onde todas as tabelas em PostgreSQL são definidas.
 - **`[telegramController.ts]`** (`kinetix-api/src/controllers/telegramController.ts`): Orquestra as tendências de bioimpedância calculando deltas semanais e interagindo com a IA para emitir Alertas Vermelhos de nutrição.
 - **`[debugRoutes.ts]`** (`kinetix-api/src/routes/debugRoutes.ts`): Endpoints de injeção manual permitindo que o Comandante dispare varreduras temporais no frontend fora da janela agendada.
 - **`[api_client.dart]`** (`kinetix_app/lib/core/network/api_client.dart`): Wrapper de rede que lida com os tokens de autenticação (Firebase) e se comunica com o Hono.
-- **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia.
+- **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia. Atua como hub de navegação injetando a rota para `bioimpedance_progress_screen.dart` via AppBar e interações de toque nativas no Card de telemetria.
 - **`[upcoming_races_card.dart]` / `[upcoming_workouts_card.dart]`**: Componentes Flutter operando de forma isolada. O `UpcomingWorkoutsCard` utiliza o `ExpansionTile` para *Glanceability* da Série Principal no estado colapsado, ocultando detalhes periféricos (Aquecimento, Desaquecimento, Repouso) sob demanda na expansão.
 - **`[lab_screen.dart]`** (`kinetix_app/lib/features/laboratory/lab_screen.dart`): Tela principal do Laboratório. Consome a rota `/api/strength/templates` para listar as fichas de treino (A, B, C) disponíveis para o atleta.
 - **`[iron_log_screen.dart]`** (`kinetix_app/lib/features/laboratory/iron_log_screen.dart`): Interface de registro do treino de força (IronLog). Ao receber uma ficha, busca seus exercícios e permite que o atleta insira a carga (kg) e repetições realizadas, persistindo a sessão via `POST /api/strength/log`.
-- **`[reports_screen.dart]`** (`kinetix_app/lib/features/dossiers/reports_screen.dart`): Tela que exibe e possibilita o download assíncrono em array de bytes dos relatórios PDF gerados nativamente pelo motor vetorial Hono.
+- **`[reports_screen.dart]`** (`kinetix_app/lib/features/dossiers/reports_screen.dart`): Tela que exibe relatórios e aciona a visualização nativa embutida através de streaming do motor vetorial Hono para o `PdfViewerScreen`.
 
 ---
 

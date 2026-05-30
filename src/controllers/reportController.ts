@@ -5,7 +5,7 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { generateLogbookPdf } from '../services/pdf/logbookService';
 import { generateCareerHistoryPdf } from '../services/pdf/careerHistoryService';
 import { generateRaceBriefingPdf } from '../services/pdf/raceBriefingService';
-import { generateCardioReportPdf } from '../services/pdf/cardioEfficiencyService';
+import { cardioEfficiencyService } from '../services/pdf/cardioEfficiencyService';
 import { generateStrengthAuditPdf } from '../services/pdf/strengthAuditService';
 
 export const reportController = {
@@ -112,7 +112,9 @@ export const reportController = {
 
   async downloadCareerHistory(c: Context) {
     try {
-      const pdfBuffer = await generateCareerHistoryPdf('primary-athlete');
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      const athleteId = athlete?.id || 'primary-athlete';
+      const pdfBuffer = await generateCareerHistoryPdf(athleteId);
       c.header('Content-Type', 'application/pdf');
       c.header('Content-Disposition', 'attachment; filename="historico_carreira.pdf"');
       return c.body(new Uint8Array(pdfBuffer));
@@ -135,8 +137,10 @@ export const reportController = {
 
   async downloadCardioReport(c: Context) {
     try {
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      const athleteId = athlete?.id || 'primary-athlete';
       const month = c.req.param('month') || 'Geral';
-      const pdfBuffer = await generateCardioReportPdf(month);
+      const pdfBuffer = await cardioEfficiencyService.generateCardioReportPdf(athleteId, month);
       c.header('Content-Type', 'application/pdf');
       c.header('Content-Disposition', `attachment; filename="cardio_report_${month}.pdf"`);
       return c.body(new Uint8Array(pdfBuffer));

@@ -1,8 +1,34 @@
 import PDFDocument from 'pdfkit';
+import { db } from '@/db';
+import { workoutSessions } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
-export function generateCareerHistoryPdf(athleteId: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    try {
+export async function generateCareerHistoryPdf(athleteId: string): Promise<Buffer> {
+  try {
+    // 1. Busca o histórico real de sessões do atleta
+    const sessions = await db.select().from(workoutSessions)
+      .where(eq(workoutSessions.athleteId, athleteId));
+
+    // 2. Agrupa o volume (em km) por ano
+    const volumeByYear: Record<string, number> = {};
+    sessions.forEach(s => {
+      const year = s.date.getFullYear().toString();
+      const km = (s.distance || 0) / 1000;
+      if (!volumeByYear[year]) volumeByYear[year] = 0;
+      volumeByYear[year] += km;
+    });
+
+    let annualData = Object.keys(volumeByYear).sort().map(year => ({
+      year,
+      volume: Math.round(volumeByYear[year])
+    }));
+
+    // Se não houver dados, garante que o gráfico renderize o ano atual zerado
+    if (annualData.length === 0) {
+      annualData = [{ year: new Date().getFullYear().toString(), volume: 0 }];
+    }
+
+    return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const buffers: Buffer[] = [];
       
@@ -14,15 +40,8 @@ export function generateCareerHistoryPdf(athleteId: string): Promise<Buffer> {
       doc.fontSize(14).fillColor('#666666').text('Esforço Anual Acumulado (Volume de Corrida)', { align: 'center' });
       doc.moveDown(3);
 
-      // Mock Data: Volume (km) por Ano
-      const annualData = [
-        { year: '2024', volume: 850 },
-        { year: '2025', volume: 1420 },
-        { year: '2026', volume: 2100 }
-      ];
-
       const startX = 100, startY = 200, maxBarWidth = 350, barHeight = 40, spacing = 30;
-      const maxVol = Math.max(...annualData.map(d => d.volume));
+      const maxVol = Math.max(...annualData.map(d => d.volume), 1); // Evita divisão por zero
 
       // Eixo Y (Linha Vertical)
       doc.moveTo(startX, startY - 20).lineTo(startX, startY + (annualData.length * (barHeight + spacing))).stroke('#cccccc');
@@ -43,6 +62,8 @@ export function generateCareerHistoryPdf(athleteId: string): Promise<Buffer> {
       });
 
       doc.end();
-    } catch (error) { reject(error); }
-  });
+    });
+  } catch (error) {
+    throw error;
+  }
 }

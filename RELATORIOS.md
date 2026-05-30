@@ -8,6 +8,8 @@ O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuai
 
 > **Nota de Arquitetura V11.1:** Os relatórios em PDF e os motores de briefings táticos agora buscam os dados da tabela `planned_workouts` de forma totalmente segmentada. O motor de extração mapeia cada modalidade individualmente pelas propriedades `{ corrida, academia, bike }` dentro do campo JSONB `details`, abandonando completamente o uso da antiga chave genérica `description`.
 
+> **Operação Bypass (V12):** Para mitigar o erro 401 (Unauthorized) ocasionado pela falta de suporte a headers de rede durante a abertura de PDFs no SDK mobile (`url_launcher` / `SfPdfViewer`), a API e o motor vetorial aceitam a autenticação Híbrida, injetando o JWT validado na Query String da chamada HTTP (`?token=<token>`).
+
 ## 📂 Estrutura de Arquivos
 
 ```text

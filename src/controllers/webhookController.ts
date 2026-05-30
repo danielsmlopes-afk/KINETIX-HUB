@@ -3,6 +3,8 @@ import { toggleMonitor } from '@/services/uptimeService';
 import { acwrService } from '@/services/acwrService';
 import { dbMaintenanceService } from '@/services/dbMaintenanceService';
 import { weatherPacingService } from '@/services/weatherPacingService';
+import { morningRaceService } from '@/services/morningRaceService';
+import { briefingService } from '@/services/briefingService';
 import { env } from '@/config/env';
 
 export const webhookController = {
@@ -70,6 +72,32 @@ export const webhookController = {
       return c.json({ data: { message: 'Manutenção do banco de dados concluída.' } }, 200);
     } catch (error) {
       return c.json({ error: 'Erro durante a manutenção do banco de dados.', code: 'DB_MAINTENANCE_ERR' }, 500);
+    }
+  },
+
+  handleManualTrigger: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
+    }
+
+    try {
+      const body = await c.req.json() as { jobId?: string };
+      const jobId = body.jobId;
+
+      switch (jobId) {
+        case 'MORNING_RACE':
+          await morningRaceService.executeMorningRoutines();
+          break;
+        case 'DAILY_BRIEFING':
+          await briefingService.executeBriefing();
+          break;
+        default:
+          return c.json({ error: 'JobId inválido ou não suportado.', code: 'BAD_REQUEST' }, 400);
+      }
+      return c.json({ data: { message: `Gatilho ${jobId} disparado com sucesso.` } }, 200);
+    } catch (error) {
+      return c.json({ error: 'Erro ao processar disparo manual.', code: 'MANUAL_TRIGGER_ERR' }, 500);
     }
   }
 };
