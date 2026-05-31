@@ -11,6 +11,10 @@ webhookRoutes.post('/manual-trigger', webhookController.handleManualTrigger);
 webhookRoutes.post('/weekly-report', webhookController.triggerWeeklyReport);
 webhookRoutes.post('/monthly-report', webhookController.triggerMonthlyReport);
 webhookRoutes.post('/race-briefing', webhookController.triggerRaceBriefing);
+webhookRoutes.post('/digital-twin', webhookController.triggerDigitalTwin);
+webhookRoutes.post('/route-recalculation', webhookController.triggerRouteRecalculation);
+webhookRoutes.post('/carb-loading', webhookController.triggerCarbLoading);
+webhookRoutes.post('/joint-checkin', webhookController.triggerJointCheckin);
 
 // Fallback de segurança: Impede que requisições GET ou erradas
 // "vazem" para o middleware do Firebase no api.ts

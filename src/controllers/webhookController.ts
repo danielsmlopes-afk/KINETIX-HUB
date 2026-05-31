@@ -12,6 +12,7 @@ import { generateCareerHistoryPdf } from '@/services/pdf/careerHistoryService';
 import { cardioEfficiencyService } from '@/services/pdf/cardioEfficiencyService';
 import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
 import { telegramMessageService } from '@/services/telegramMessageService';
+import { StravaService } from '@/services/stravaService';
 
 export const webhookController = {
   toggleUptime: async (c: Context) => {
@@ -23,11 +24,11 @@ export const webhookController = {
 
     try {
       // 2. Extração do payload (0 ou 1)
-      const body = await c.req.json();
+      const body = await c.req.json().catch(() => ({}));
       const status = body.status;
 
       if (status !== 0 && status !== 1) {
-        return c.json({ error: 'Status inválido. Use 0 ou 1.', code: 'BAD_REQUEST' }, 400);
+        return c.json({ data: { message: 'Ping de Uptime recebido sem alteração de status.' } }, 200);
       }
 
       // 3. Execução da ação
@@ -179,6 +180,78 @@ export const webhookController = {
         }
       } catch (error) {
         console.error('❌ [Webhook] Erro no triggerRaceBriefing:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerDigitalTwin: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        const stravaService = new StravaService();
+        await stravaService.scanAndLogEnduranceRun();
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerDigitalTwin:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerRouteRecalculation: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        console.log('[Webhook] Executando Route Recalculation e Fechamento');
+        // Futuro: Implementar chamada de webhook para recalculo assim que o endpoint nativo existir.
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerRouteRecalculation:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerCarbLoading: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        console.log('[Webhook] Disparando Alerta de Carb-Loading Estratégico');
+        const chatId = Number(env.TELEGRAM_CHAT_ID);
+        const msg = `🍝 *Alerta Nutricional: Saturação de Carboidratos*\n\nComandante, prepare-se para o Longão de amanhã!\n\n- Inicie a saturação de carboidratos agora mesmo.\n- Reforce a hidratação (mínimo de 500ml de água antes de dormir).\n- Separe os géis e cápsulas de sal no seu arsenal logístico.\n\nBom descanso e foco absoluto na missão!`;
+        await telegramMessageService.sendSimpleMessage(chatId, msg);
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerCarbLoading:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerJointCheckin: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        console.log('[Webhook] Disparando Check-in Articular Diário');
+        const chatId = Number(env.TELEGRAM_CHAT_ID);
+        const msg = `🦾 *Check-in Articular Diário*\n\nComo está o chassi hoje, comandante? Há algum desconforto agudo nos joelhos, panturrilhas ou ombro?\n\nSe existir alguma restrição clínica, responda com o comando:\n\`/dor <nota de 1 a 10> <local da dor>\`\n\n_Exemplo:_ \`/dor 4 joelho direito\``;
+        await telegramMessageService.sendSimpleMessage(chatId, msg);
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerJointCheckin:', error);
       }
     })();
     return c.text('OK', 200);

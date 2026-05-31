@@ -35,6 +35,14 @@ export const runWeeklyReportJob = async () => {
   }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
 };
 
+export const runDigitalTwinJob = async () => {
+  console.log('[Cron] Acionando Gateway Webhook: Varredura do Longão (Digital Twin)');
+  await fetch(`${localWebhookUrl}/digital-twin`, {
+    method: 'POST',
+    headers: { 'x-cron-secret': env.CRON_SECRET }
+  }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
+};
+
 export const startCronJobs = () => initCronJobs();
 
 export const initCronJobs = () => {
@@ -44,10 +52,7 @@ export const initCronJobs = () => {
   cron.schedule('0 7 * * *', runMorningRaceJob, { timezone: 'America/Sao_Paulo' });
 
   // 14:59 (Domingo) - Varredura Longão Digital Twin
-  cron.schedule('59 14 * * 0', async () => {
-    console.log('[Cron] Executando Varredura do Longão (Digital Twin)');
-    // Implementação da IA tática entra aqui
-  }, { timezone: 'America/Sao_Paulo' });
+  cron.schedule('59 14 * * 0', runDigitalTwinJob, { timezone: 'America/Sao_Paulo' });
 
   // 15:00 (Domingo) - Geração de Relatórios e Dossiês
   cron.schedule('0 15 * * 0', runWeeklyReportJob, { timezone: 'America/Sao_Paulo' });
