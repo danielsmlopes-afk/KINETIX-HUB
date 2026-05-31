@@ -6,6 +6,11 @@ import { weatherPacingService } from '@/services/weatherPacingService';
 import { morningRaceService } from '@/services/morningRaceService';
 import { briefingService } from '@/services/briefingService';
 import { env } from '@/config/env';
+import { athleteRepository } from '@/repositories/athleteRepository';
+import { generateLogbookPdf } from '@/services/pdf/logbookService';
+import { generateCareerHistoryPdf } from '@/services/pdf/careerHistoryService';
+import { cardioEfficiencyService } from '@/services/pdf/cardioEfficiencyService';
+import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
 
 export const webhookController = {
   toggleUptime: async (c: Context) => {
@@ -99,5 +104,65 @@ export const webhookController = {
     } catch (error) {
       return c.json({ error: 'Erro ao processar disparo manual.', code: 'MANUAL_TRIGGER_ERR' }, 500);
     }
+  },
+
+  triggerWeeklyReport: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    // Fire and forget
+    (async () => {
+      try {
+        const athlete = await athleteRepository.getPrimaryAthlete();
+        const athleteId = athlete?.id || 'primary-athlete';
+        await generateLogbookPdf('Ciclo Ativo');
+        await generateCareerHistoryPdf(athleteId);
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerWeeklyReport:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerMonthlyReport: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        const athlete = await athleteRepository.getPrimaryAthlete();
+        const athleteId = athlete?.id || 'primary-athlete';
+        await cardioEfficiencyService.generateCardioReportPdf(athleteId, 'Geral');
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerMonthlyReport:', error);
+      }
+    })();
+    return c.text('OK', 200);
+  },
+
+  triggerRaceBriefing: async (c: Context) => {
+    const secret = c.req.header('x-cron-secret');
+    if (secret !== env.CRON_SECRET) {
+      return c.text('Unauthorized', 401);
+    }
+
+    (async () => {
+      try {
+        let raceId = 'SP-21K'; // Fallback
+        try {
+          const body = await c.req.json();
+          if (body && body.raceId) raceId = body.raceId;
+        } catch (e) {} // Continua silenciosamente se não houver JSON
+        
+        await generateRaceBriefingPdf(raceId);
+      } catch (error) {
+        console.error('❌ [Webhook] Erro no triggerRaceBriefing:', error);
+      }
+    })();
+    return c.text('OK', 200);
   }
 };

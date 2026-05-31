@@ -8,7 +8,6 @@ import { strengthRoutes } from '@/routes/strengthRoutes';
 import racesRouter from '@/routes/races';
 import { importRoutes } from '@/routes/importRoutes';
 import { coachRoutes } from '@/routes/coachRoutes';
-import { webhookRoutes } from '@/routes/webhookRoutes';
 import { gearRoutes } from '@/routes/gearRoutes';
 import { firebaseAuthMiddleware } from '@/config/authMiddleware';
 import { dossierController } from '@/controllers/dossierController';
@@ -20,7 +19,6 @@ apiRoutes.post('/webhook/telegram', telegramController.handleWebhook);
 apiRoutes.get('/cron/daily', telegramController.handleCron);
 apiRoutes.get('/cron/recalculate', telegramController.handleRecalculate);
 apiRoutes.route('/strava', stravaRoutes);
-apiRoutes.route('/', webhookRoutes);
 
 // 2. ROTAS PRIVADAS DO APP (Requerem Firebase Auth)
 const privateAppRoutes = new Hono();
