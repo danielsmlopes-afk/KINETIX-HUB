@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { athletes, plannedWorkouts, bioimpedanceLogs, pendingActions, races } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, gte } from 'drizzle-orm';
 import { telegramMessageService } from '@/services/telegramMessageService';
 import crypto from 'crypto';
 
@@ -22,6 +22,7 @@ export const telegramController = {
           'cmd_provaalvo': '/provaalvo',
           'cmd_hoje': '/hoje',
           'cmd_briefing': '/briefing',
+          'cmd_mapa': '/mapa',
           'cmd_auditoria': '/auditoria',
           'cmd_peso': '/peso',
           'cmd_dor': '/dor'
@@ -104,9 +105,10 @@ export const telegramController = {
               ],
               [
                 { text: '📡 Briefing de Amanhã', callback_data: 'cmd_briefing' },
-                { text: '🔎 Auditar Strava', callback_data: 'cmd_auditoria' }
+                { text: '️ Mapa da Prova', callback_data: 'cmd_mapa' }
               ],
               [
+                { text: '🔎 Auditar Strava', callback_data: 'cmd_auditoria' },
                 { text: '⚖️ Peso', callback_data: 'cmd_peso' },
                 { text: '🩹 Relatar Dor', callback_data: 'cmd_dor' }
               ]
@@ -123,6 +125,32 @@ export const telegramController = {
         // Delegação para serviços existentes
         if (text === '/briefing' || text === '/auditoria') {
           await telegramMessageService.processIncomingMessage(chatId, text);
+          return c.text('OK', 200);
+        }
+
+        // Comando: /mapa (Renderiza a Polyline e o Clima da Prova Alvo sob demanda)
+        if (text === '/mapa') {
+          const { fetchMapStaticBuffer } = require('@/services/pdfGeneratorService');
+          const { briefingService } = require('@/services/briefingService');
+          
+          const nextRaceList = await db.select().from(races)
+            .where(and(eq(races.isTarget, true), gte(races.date, new Date())))
+            .orderBy(races.date).limit(1);
+
+          if (nextRaceList.length > 0 && nextRaceList[0].polyline) {
+            const race = nextRaceList[0];
+            const weatherForecast = await briefingService.getWeatherPoP(race.latitude, race.longitude);
+            const mapBuffer = await fetchMapStaticBuffer(race.polyline);
+
+            if (mapBuffer) {
+              const caption = `🗺️ *MAPEAMENTO TÁTICO: ${race.name || 'Operação'}*\n📍 Arena: ${race.startLocation || 'N/D'}\n${weatherForecast}\n\nA topografia e a rota de combate estão anexadas. Foco na missão!`;
+              await telegramMessageService.sendPhoto(chatId, mapBuffer, caption);
+            } else {
+              await telegramMessageService.sendSimpleMessage(chatId, "⚠️ *Soberania Cartográfica offline*. Não foi possível gerar a imagem da rota.");
+            }
+          } else {
+            await telegramMessageService.sendSimpleMessage(chatId, "⚠️ Nenhuma polyline de prova alvo disponível na base de dados para mapeamento.");
+          }
           return c.text('OK', 200);
         }
 

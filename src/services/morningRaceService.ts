@@ -3,9 +3,11 @@ import { db } from '@/db';
 import { races, athletes, bioimpedanceLogs, cronLogs } from '@/db/schema';
 import { askHeadCoach } from './headCoachService';
 import { getEstimatedTravelTime } from './routingService';
-import { escapeMarkdown } from './briefingService';
+import { escapeMarkdown, briefingService } from './briefingService';
 import { telegramMessageService } from './telegramMessageService';
 import { env } from '@/config/env';
+import { generateRaceBriefingPdf } from './pdf/raceBriefingService';
+import { fetchMapStaticBuffer } from './pdfGeneratorService';
 
 type Race = InferSelectModel<typeof races>;
 type Athlete = InferSelectModel<typeof athletes>;
@@ -68,13 +70,32 @@ Finalize com uma frase de foco.`;
     const normalized = (wakeMins + 24 * 60) % (24 * 60);
     const wakeUpTime = `${String(Math.floor(normalized / 60)).padStart(2, '0')}:${String(Math.floor(normalized % 60)).padStart(2, '0')}`;
 
-    const systemPrompt = `Atue como Head Coach. Amanhã é o dia da prova de ${race.distance}km.
-Tarefa 1 - Checklist de Combate: Liste a preparação do equipamento (chip, número de peito).
+    // Aciona a Engine de Telemetria Climática
+    const weatherForecast = await briefingService.getWeatherPoP(race.latitude, race.longitude);
+
+    const systemPrompt = `Atue como Head Coach. Amanhã é o dia da prova de ${race.distance}km. Clima na arena de largada: ${weatherForecast}.
+Tarefa 1 - Checklist de Combate: Liste a preparação do equipamento (chip, número de peito) recomendando adaptação a este clima.
 Tarefa 2 - Nutrição da Véspera: Jantar até às 19h.`;
 
     const aiResponse = await askHeadCoach(`Gerar Checklist D-1 para ${race.name || race.category}`, undefined, systemPrompt);
     const wazeLink = (race.latitude && race.longitude) ? `https://waze.com/ul?ll=${race.latitude},${race.longitude}&navigate=yes` : 'N/D';
-    const template = `🚨 ORDEM DE EXECUÇÃO: VÉSPERA DA PROVA (D-1)\n📍 Operação: ${race.name || race.category} | ${race.address || 'N/D'}\n🚗 Trânsito Estimado (OSRM): ${travelMins} min.\n⏰ Ignição (Largada): ${race.startTime}.\n🛌 Despertar Tático: ${wakeUpTime}.\n\n${aiResponse}`;
+    const template = `🚨 ORDEM DE EXECUÇÃO: VÉSPERA DA PROVA (D-1)\n📍 Operação: ${race.name || race.category} | ${race.address || 'N/D'}\n${weatherForecast}\n🚗 Trânsito Estimado (OSRM): ${travelMins} min.\n⏰ Ignição (Largada): ${race.startTime}.\n🛌 Despertar Tático: ${wakeUpTime}.\n\n${aiResponse}`;
+
+    try {
+      if (env.TELEGRAM_CHAT_ID) {
+        const briefingBuffer = await generateRaceBriefingPdf(race.id);
+        if (briefingBuffer) {
+          await telegramMessageService.sendPdfReport(
+            Number(env.TELEGRAM_CHAT_ID),
+            briefingBuffer,
+            `RaceBriefing_${race.id}.pdf`,
+            `🎯 *PRONTUÁRIO DE PROVA: ${race.name || race.category}*\n\nMapa da rota (polyline) e Tabela Smart Pace anexados.`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('❌ [MorningRaceService] Erro ao gerar/enviar PDF de Briefing no D-1:', error);
+    }
 
     return `${escapeMarkdown(template)}\n\n🔗 Rota de Aproximação (Waze): Link`;
   }
@@ -106,12 +127,25 @@ Tarefa 2 - Nutrição da Véspera: Jantar até às 19h.`;
         const diffDays = Math.ceil((rDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         let message = '';
+        let mapBuffer: Buffer | null = null;
+
         if (diffDays === 3) message = await this.processD3(athlete.id, race);
         else if (diffDays === 2) message = await this.processD2(race);
-        else if (diffDays === 1) message = await this.processD1(athlete, race);
+        else if (diffDays === 1) {
+          message = await this.processD1(athlete, race);
+          // No D-1, extraímos a imagem da rota cartográfica
+          if (race.polyline) {
+            mapBuffer = await fetchMapStaticBuffer(race.polyline);
+          }
+        }
 
         if (message && env.TELEGRAM_CHAT_ID) {
-          await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), message);
+          if (mapBuffer) {
+            // Envia a Polyline fundida à mensagem tática e climática
+            await telegramMessageService.sendPhoto(Number(env.TELEGRAM_CHAT_ID), mapBuffer, message);
+          } else {
+            await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), message);
+          }
           protocolsExecuted++;
         }
       }

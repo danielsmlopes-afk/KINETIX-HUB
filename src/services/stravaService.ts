@@ -169,8 +169,14 @@ export class StravaService {
     const plannedWorkout = planned[0];
 
     let weather = 'N/A';
+    let weatherVespera = 'N/A';
     if (longRun.start_latlng && longRun.start_latlng.length === 2) {
         weather = await getHistoricalWeather(longRun.start_latlng[0], longRun.start_latlng[1], longRun.start_date) || 'N/A';
+        
+        // Retrocesso matemático de 24 horas (Véspera do treino)
+        const runDate = new Date(longRun.start_date);
+        const prevDayDate = new Date(runDate.getTime() - (24 * 60 * 60 * 1000));
+        weatherVespera = await getHistoricalWeather(longRun.start_latlng[0], longRun.start_latlng[1], prevDayDate.toISOString()) || 'N/A';
     }
 
     const context = {
@@ -178,9 +184,10 @@ export class StravaService {
         paceReal: new Date(longRun.moving_time * 1000).toISOString().substr(14, 5),
         cardio: longRun.average_heartrate,
         clima: weather,
+        climaVespera: weatherVespera,
         planejado: plannedWorkout.details,
     };
-    const prompt = `Analise a performance do longão de hoje. Gere um score de 5 a 10 e uma análise de 4 linhas sobre o desempenho, considerando o planejado. Formato de saída JSON: {"score_performance": X, "analise_ia": "..."}`;
+    const prompt = `Atue como fisiologista de endurance. Analise a performance do longão cruzando as métricas de BPM médio e Pace com o impacto latente da temperatura climática na véspera (sono/madrugada) informada no contexto. Gere um score de 5 a 10 e uma análise de 4 linhas sobre o desempenho e provável 'Cardiac Drift', considerando o planejado. Formato de saída JSON: {"score_performance": X, "analise_ia": "..."}`;
     const aiRawResponse = await askHeadCoach(prompt, context);
     const aiResponse = JSON.parse(aiRawResponse.replace(/```json/g, '').replace(/```/g, '').trim());
 
@@ -191,7 +198,7 @@ export class StravaService {
         pace_meta: (plannedWorkout.details as any)?.corrida?.match(/@\s*(\d{1,2}:\d{2})/)?.[1],
         laps: longRun.laps,
         cardio: longRun.average_heartrate,
-        clima: weather,
+        clima: `Treino: ${weather} | Véspera: ${weatherVespera}`,
         score_performance: aiResponse.score_performance,
         analise_ia: aiResponse.analise_ia,
         feedback_dor: null,

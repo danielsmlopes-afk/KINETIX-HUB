@@ -30,18 +30,25 @@ Use um tom clínico, focado em performance e proteção.`;
   }
 
   /**
-   * Extrai a probabilidade de chuva para as próximas 24h via OpenWeatherMap
+   * Extrai a probabilidade de chuva e temperatura para as próximas 24h via OpenWeatherMap
    */
-  private async getWeatherPoP(): Promise<string> {
+  public async getWeatherPoP(lat?: number | null, lon?: number | null): Promise<string> {
     try {
       const apiKey = env.OPENWEATHER_API_KEY;
       if (!apiKey) return '🌦️ N/D';
-      // Coordenadas táticas por padrão (São Paulo)
-      const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=-23.5505&lon=-46.6333&appid=${apiKey}&units=metric`);
+      
+      const targetLat = lat ?? -23.5505; // Coordenada tática por padrão (São Paulo)
+      const targetLon = lon ?? -46.6333;
+      
+      const res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${targetLat}&lon=${targetLon}&appid=${apiKey}&units=metric`);
       if (!res.ok) return '🌦️ N/D';
-      const data = await res.json() as { list?: Array<{ pop?: number }> };
-      const pop = data.list?.[8]?.pop || 0; // Índice 8 = Previsão de +24h
-      return `🌦️ ${(pop * 100).toFixed(0)}% chance de chuva`;
+      const data = await res.json() as { list?: Array<{ pop?: number, main?: { temp?: number } }> };
+      const forecast = data.list?.[8]; // Índice 8 = Previsão de +24h
+      const pop = forecast?.pop || 0; 
+      const temp = forecast?.main?.temp;
+      
+      const popStr = `🌦️ ${(pop * 100).toFixed(0)}% chance de chuva`;
+      return temp ? `${popStr} | 🌡️ ${temp.toFixed(1)}°C` : popStr;
     } catch {
       return '🌦️ N/D';
     }

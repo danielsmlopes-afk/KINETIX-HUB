@@ -6,6 +6,8 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { db } from '@/db';
 import { plannedWorkouts } from '@/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
+import { StravaService } from '@/services/stravaService';
+import { telegramMessageService } from '@/services/telegramMessageService';
 
 type StravaWebhookPayload = {
   'hub.mode'?: string;
@@ -130,11 +132,32 @@ export const stravaController = {
     }
 
     // Delegação para o novo Protocolo de Esteira Calibrada (V2)
-    await coachService.auditWorkout(
+    const auditResult = await coachService.auditWorkout(
       activity as any,
       plannedRun.id,
       targetDistanceKm,
       targetPaceStr
     );
+
+    // 🚨 Notificação instantânea da Auditoria no Telegram com o Motivo
+    let statusEmoji = '✅';
+    if (auditResult.complianceStatus === 'PARTIAL') statusEmoji = '⚠️';
+    else if (auditResult.complianceStatus === 'COMPLETED_NOT_VALIDATED') statusEmoji = '❌';
+
+    const auditMsg = `🏃‍♂️ *AUDITORIA DE COMBATE (STRAVA)* 🏃‍♂️\n\n` +
+      `*Missão:* ${activity.name}\n` +
+      `*Distância:* ${distanceKm}km\n` +
+      `*Pace Médio:* ${paceMins}:${paceSecs}/km\n` +
+      `*Status:* ${statusEmoji} ${auditResult.complianceStatus}\n\n` +
+      `*Parecer do Head Coach:*\n_${auditResult.feedback}_`;
+
+    await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), auditMsg);
+
+    // Gatilho imediato do Digital Twin para Longões (>= 4.9km)
+    if (distanceKm >= 4.9) {
+      console.log(`[Strava] Gatilho imediato do Digital Twin acionado para o longão de ${distanceKm}km.`);
+      const stravaSvc = new StravaService();
+      stravaSvc.scanAndLogEnduranceRun().catch(console.error);
+    }
   }
 };

@@ -30,6 +30,26 @@ async function sendMsg(chatId: number, text: string): Promise<void> {
 }
 
 export const telegramMessageService = {
+  async sendPhoto(chatId: number, photoBuffer: Buffer, caption: string): Promise<void> {
+    try {
+      console.log(`[Telegram] Enviando imagem cartográfica (Polyline) para o chat ${chatId}...`);
+      const form = new FormData();
+      form.append('chat_id', chatId.toString());
+      form.append('caption', caption);
+      form.append('parse_mode', 'Markdown'); // Garante suporte a negrito/clima na legenda
+
+      const blob = new Blob([new Uint8Array(photoBuffer)], { type: 'image/png' });
+      form.append('photo', blob, 'map.png');
+
+      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        body: form
+      });
+    } catch (error) {
+      console.error('❌ [Telegram] Falha ao enviar a foto cartográfica:', error);
+    }
+  },
+
   async sendPdfReport(chatId: number, pdfBuffer: Buffer, filename: string, caption: string): Promise<void> {
     try {
       console.log(`[Telegram] Enviando documento PDF (${filename}) para o chat ${chatId}...`);
