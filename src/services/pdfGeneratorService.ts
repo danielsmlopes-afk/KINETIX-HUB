@@ -1,22 +1,31 @@
 // Arquivo: src/services/pdfGeneratorService.ts
 import PDFDocument from 'pdfkit';
-import { eq, and, between, inArray } from 'drizzle-orm';
+import { eq, and, between, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { env } from '@/config/env';
 import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
 
-function decodePolyline(str: string, p = 5): [number, number][] {
-  let idx = 0, lat = 0, lng = 0, coords: [number, number][] = [], factor = Math.pow(10, p);
-  while (idx < str.length) {
-    let b, shift = 0, res = 0;
-    do { b = str.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += ((res & 1) ? ~(res >> 1) : (res >> 1));
-    shift = res = 0;
-    do { b = str.charCodeAt(idx++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += ((res & 1) ? ~(res >> 1) : (res >> 1));
-    coords.push([lat / factor, lng / factor]);
+const mapBufferCache = new Map<string, Buffer>();
+
+export async function fetchMapStaticBuffer(polyline: string): Promise<Buffer | null> {
+  if (!env.MAPSTATIC_URL || !polyline) return null;
+  
+  if (mapBufferCache.has(polyline)) return mapBufferCache.get(polyline)!;
+
+  try {
+    const url = new URL(env.MAPSTATIC_URL);
+    url.searchParams.append('path', `weight:3|color:0xff0000ff|enc:${polyline}`);
+    url.searchParams.append('size', '600x300');
+    const response = await fetch(url.toString());
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    mapBufferCache.set(polyline, buffer);
+    return buffer;
+  } catch (error) {
+    console.error('❌ [MapStatic] Erro de rede interna:', error);
+    return null;
   }
-  return coords;
 }
 
 export async function generatePhysiologicalXRayPDF(athleteId: string, month: number, year: number): Promise<Buffer> {
@@ -156,6 +165,11 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
     paceStr = `${paceMins}:${paceSecs.toString().padStart(2, '0')} /km`;
   }
 
+  let mapBuffer: Buffer | null = null;
+  if (race.polyline) {
+    mapBuffer = await fetchMapStaticBuffer(race.polyline);
+  }
+
   return new Promise((resolve, reject) => {
     const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
     const doc = new Doc({ margin: 50 });
@@ -178,33 +192,11 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
     doc.text(`Pace Médio: ${paceStr}`).moveDown(2);
 
     if (race.polyline) {
-      doc.fontSize(14).text('Traçado do Percurso (GPS):').moveDown(1);
-      
-      const startX = doc.x;
-      const startY = doc.y;
-      const chartWidth = 400;
-      const chartHeight = 250;
-      
-      doc.rect(startX, startY, chartWidth, chartHeight).fillAndStroke('#f3f4f6', '#e5e7eb');
-      const coords = decodePolyline(race.polyline);
-      if (coords.length > 0) {
-        let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-        for (const [lat, lng] of coords) {
-          if (lat < minLat) minLat = lat;
-          if (lat > maxLat) maxLat = lat;
-          if (lng < minLng) minLng = lng;
-          if (lng > maxLng) maxLng = lng;
-        }
-        const latRange = maxLat - minLat || 1;
-        const lngRange = maxLng - minLng || 1;
-        doc.lineWidth(3).strokeColor('#fc4c02');
-        const margin = 10, innerWidth = chartWidth - margin * 2, innerHeight = chartHeight - margin * 2;
-        coords.forEach(([lat, lng], i) => {
-          const px = startX + margin + ((lng - minLng) / lngRange) * innerWidth;
-          const py = startY + margin + innerHeight - ((lat - minLat) / latRange) * innerHeight;
-          if (i === 0) doc.moveTo(px, py); else doc.lineTo(px, py);
-        });
-        doc.stroke();
+      doc.fontSize(14).text('Traçado do Percurso (Soberania Cartográfica / MapStatic):').moveDown(1);
+      if (mapBuffer) {
+        doc.image(mapBuffer, { fit: [450, 250], align: 'center' });
+      } else {
+        doc.fillColor('red').text('Mapa indisponível na rede interna.', { align: 'center' }).fillColor('black');
       }
     }
     doc.end();
@@ -351,6 +343,39 @@ export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
 export async function generateCareerReportPDF(): Promise<Buffer> {
   const allRaces = await db.select().from(races).orderBy(races.date);
 
+  let prRecords: any[] = [];
+  try {
+    const prRecordsResult = await db.execute(sql`
+      WITH ActivityPRs AS (
+        SELECT 
+          id,
+          EXTRACT(YEAR FROM date) AS year,
+          distance,
+          "durationMinutes",
+          "map_polyline" AS mapPolyline,
+          CASE 
+            WHEN distance >= 9.5 AND distance <= 10.5 THEN '10km'
+            WHEN distance >= 20.5 AND distance <= 22.0 THEN '21km'
+            WHEN distance >= 41.5 THEN '42km'
+          END AS distance_target
+        FROM workout_sessions
+        WHERE "activityType" = 'RUN' AND "durationMinutes" IS NOT NULL
+      ), 
+      RankedPRs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY year, distance_target ORDER BY "durationMinutes" ASC) as rank
+        FROM ActivityPRs
+        WHERE distance_target IS NOT NULL
+      )
+      SELECT * FROM RankedPRs WHERE rank = 1 ORDER BY year DESC, distance_target ASC;
+    `);
+    prRecords = (prRecordsResult.rows || prRecordsResult) as any[];
+    for (const pr of prRecords) {
+      if (pr.mapPolyline) pr.mapImageBuffer = await fetchMapStaticBuffer(pr.mapPolyline);
+    }
+  } catch (err) {
+    console.error('Erro ao buscar PRs com Polylines:', err);
+  }
+
   return new Promise((resolve, reject) => {
     const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
     const doc = new Doc({ margin: 50 });
@@ -387,6 +412,23 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
       if (r.weather) doc.text(`    Clima: ${r.weather}`);
       doc.moveDown(0.5);
     });
+
+    if (prRecords.length > 0) {
+      doc.addPage();
+      doc.fontSize(16).fillColor('black').text('Marcas de Combate (PR) com Soberania Cartográfica', { underline: true });
+      doc.moveDown(1);
+      for (const pr of prRecords) {
+        doc.fontSize(12).font('Helvetica-Bold').text(`${pr.year} - ${pr.distance_target}`);
+        doc.font('Helvetica').text(`Tempo Oficial: ${pr.durationMinutes} minutos | Distância Apurada: ${pr.distance} km`);
+        doc.moveDown(0.5);
+        if (pr.mapImageBuffer) {
+          doc.image(pr.mapImageBuffer, { fit: [450, 200], align: 'center' });
+        } else {
+          doc.fillColor('red').text('Mapa indisponível na rede interna.', { align: 'center' }).fillColor('black');
+        }
+        doc.moveDown(2);
+      }
+    }
 
     doc.end();
   });

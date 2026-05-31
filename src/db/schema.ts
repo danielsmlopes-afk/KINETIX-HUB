@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, doublePrecision, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, doublePrecision, boolean, jsonb, unique } from 'drizzle-orm/pg-core';
 
 export const athletes = pgTable('athletes', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -87,6 +87,7 @@ export const workoutSessions = pgTable('workout_sessions', {
   averageHeartRate: integer('average_heartrate'),
   warmup: text('warmup'),
   cooldown: text('cooldown'),
+  mapPolyline: text('map_polyline'),
 });
 
 export const treadmillIntervals = pgTable('treadmill_intervals', {
@@ -110,7 +111,9 @@ export const bioimpedanceLogs = pgTable('bioimpedance_logs', {
   protein: doublePrecision('protein').notNull(),
   boneMass: doublePrecision('bone_mass').notNull(),
   healthNotes: text('health_notes'),
-});
+}, (t) => ({
+  unq: unique().on(t.athleteId, t.date),
+}));
 
 export const plannedWorkouts = pgTable('planned_workouts', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -30,7 +30,8 @@ export const workoutService = {
       load: pnl,
       distance: activity.distance,
       gearId: activity.gear_id,
-      averageHeartRate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null
+      averageHeartRate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
+      mapPolyline: activity.map?.summary_polyline || null
     });
     console.log(`📊 Treino salvo! Duração: ${durationMinutes}min | Carga Normalizada (PNL calculada): ${pnl.toFixed(2)}`);
 
@@ -44,11 +45,28 @@ export const workoutService = {
     }
   },
 
-  async validateManualWorkout(workoutId: string, modality: string) {
+  async validateManualWorkout(workoutId: string, modality: string, mapPolyline?: string, distance?: number) {
     // Marca o registro do plano diretamente como VALIDATED
     await db.update(plannedWorkouts)
       .set({ complianceStatus: 'VALIDATED' })
       .where(eq(plannedWorkouts.id, workoutId));
+
+    // Se houver dados de telemetria indoor/virtual vindos da validação do App
+    if (mapPolyline || distance) {
+      const planList = await db.select().from(plannedWorkouts).where(eq(plannedWorkouts.id, workoutId)).limit(1);
+      if (planList.length > 0) {
+        const plan = planList[0];
+        await db.insert(workoutSessions).values({
+          athleteId: plan.athleteId,
+          date: plan.date,
+          durationMinutes: 60, // Fallback de fallback genérico para registro manual
+          distance: distance ? Number(distance) : null,
+          mapPolyline: mapPolyline || null,
+        });
+        console.log(`🗺️ [Soberania Cartográfica] Sessão Indoor/Virtual injetada na telemetria. Distância: ${distance || 0}m`);
+      }
+    }
+
     console.log(`✅ [Manual Validation] Treino ${workoutId} (Modalidade: ${modality}) chancelado manualmente.`);
   }
 };

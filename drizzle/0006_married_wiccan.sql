@@ -1,0 +1,1 @@
+ALTER TABLE "bioimpedance_logs" ADD CONSTRAINT "bioimpedance_logs_athlete_id_date_unique" UNIQUE("athlete_id","date");

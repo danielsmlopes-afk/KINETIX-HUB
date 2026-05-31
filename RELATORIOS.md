@@ -10,6 +10,8 @@ O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuai
 
 > **Operação Bypass (V12):** Para mitigar o erro 401 (Unauthorized) ocasionado pela falta de suporte a headers de rede durante a abertura de PDFs no SDK mobile (`url_launcher` / `SfPdfViewer`), a API e o motor vetorial aceitam a autenticação Híbrida, injetando o JWT validado na Query String da chamada HTTP (`?token=<token>`).
 
+> **Soberania Cartográfica (MapStatic + Redis):** A renderização não utiliza motores front-end de mapas e não compartilha dados de localização externamente. O serviço consulta um contêiner nativo `stefanocudini/docker-mapstatic` na rede, guarda o `Buffer` localmente no Redis via LRU, e injeta o objeto nativo como imagem pura no PDF.
+
 ## 📂 Estrutura de Arquivos
 
 ```text

@@ -36,6 +36,20 @@
       "when": 1780044106062,
       "tag": "0004_perpetual_wallflower",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1780186411406,
+      "tag": "0005_striped_marvex",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1780195456548,
+      "tag": "0006_married_wiccan",
+      "breakpoints": true
     }
   ]
 }

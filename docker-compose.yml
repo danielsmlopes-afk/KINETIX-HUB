@@ -7,15 +7,24 @@ services:
       - "3000:3000"
     environment:
       - MAPSTATIC_URL=http://mapstatic:8080/image
+      - REDIS_URL=redis://redis:6379
     networks:
       - kinetix-net
     depends_on:
       - mapstatic
+      - redis
 
   mapstatic:
     image: stefanocudini/docker-mapstatic
     ports:
       - "8080:8080"
+    networks:
+      - kinetix-net
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
     networks:
       - kinetix-net
 

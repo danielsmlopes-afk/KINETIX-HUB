@@ -13,3 +13,6 @@ Ainda no escopo manual, o `coachController.ts` expõe a rota para atualização 
 
 ## Auth Middleware & Autenticação Híbrida
 O `authMiddleware.ts` atua como o portão de segurança do Hono. Para garantir a viabilidade da leitura nativa de PDFs via dispositivos mobile (onde a manipulação de Headers de rede no visualizador pode ser limitada ou inexistente), ele executa a **Operação Bypass**: tenta extrair primeiramente o header `Authorization: Bearer <token>` e, caso não o encontre, faz um fallback seguro extraindo o token estritamente da query string (ex: `c.req.query("token")`).
+
+## Motor Vetorial Cartográfico (MapStatic) e Cache em Redis
+Os motores de geração de dossiês (`pdfGeneratorService.ts`) executam o serviço `fetchMapStaticBuffer` para buscar imagens de trajetos sem vazar dados para a web externa. As polylines extraídas da tabela `workout_sessions` realizam uma chamada HTTP nativa que intercepta a variável `MAPSTATIC_URL`. O serviço emprega o sistema de cache no Redis para mapear requests repetitivos em buffer de memória, garantindo alta performance e segurança.

@@ -46,6 +46,7 @@ O KINETIX HUB opera com **Fuso Horário Oficial Blindado em América/Sao_Paulo (
 * **Motor de IA**: Gemini 2.5 Flash / Groq operando a inteligência tática (*Head Coach*).
 * **Integrações**: Strava Webhooks, Telegram Bot API, OpenWeatherMap.
 * **Motor Cartográfico Interno (MapStatic)**: Instância própria operando via Docker que garante a **Soberania Cartográfica** da plataforma. A plotagem de *polylines* nos relatórios em PDF ocorre estritamente dentro da rede interna, sem vazar dados sigilosos de geolocalização do Strava para APIs cartográficas de terceiros.
+* **Cache em Memória (Redis)**: Instância de cache acoplada rodando na infraestrutura Docker (`kinetix-net`). Intercepta requisições de renderização de mapas do MapStatic, eliminando chamadas repetitivas de mesma polyline, otimizando carga em relatórios densos.
 
 ### Status de Compliance e Zonas de Treinamento
 
@@ -191,7 +192,7 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 ### 3. `workout_sessions` & `treadmill_intervals` (As Execuções)
 
 * **Função:** Registo dos treinos de fato realizados (após telemetria ou inclusão manual).
-* **Colunas Principais:** `id` (UUID), `durationMinutes` (Int), `distance` (Float), `warmup` e `cooldown` (Text). `treadmill_intervals` guarda parciais com FK para `sessionId`.
+* **Colunas Principais:** `id` (UUID), `durationMinutes` (Int), `distance` (Float), `warmup` e `cooldown` (Text), **`map_polyline`** (Text, trajeto georreferenciado). `treadmill_intervals` guarda parciais com FK para `sessionId`.
 
 ### 4. `races` (Provas Alvo)
 
