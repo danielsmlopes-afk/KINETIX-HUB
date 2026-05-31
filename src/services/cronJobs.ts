@@ -1,53 +1,38 @@
 import cron from 'node-cron';
 import { env } from '@/config/env';
 import { telegramMessageService } from '@/services/telegramMessageService';
-import { morningRaceService } from '@/services/morningRaceService';
-import { briefingService } from '@/services/briefingService';
-import { coachService } from '@/services/coachService';
-import { generateLogbookPdf } from '@/services/pdf/logbookService';
-import { athleteRepository } from '@/repositories/athleteRepository';
+
+const localWebhookUrl = `http://localhost:${env.PORT || 3000}/api/webhook`;
 
 export const runMorningRaceJob = async () => {
-  console.log('[Cron] Executando Morning Race Job');
-  try {
-    await morningRaceService.executeMorningRoutines();
-  } catch (error) {
-    console.error('[Cron] Falha no Morning Race Job:', error);
-  }
+  console.log('[Cron] Acionando Gateway Webhook: Morning Race Job');
+  await fetch(`${localWebhookUrl}/manual-trigger`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
+    body: JSON.stringify({ jobId: 'MORNING_RACE' })
+  }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
 };
 
 export const runDailyBriefingJob = async () => {
-  console.log('[Cron] Executando Daily Briefing');
-  try {
-    await briefingService.executeBriefing();
-  } catch (error) {
-    console.error('[Cron] Falha no Daily Briefing:', error);
-  }
+  console.log('[Cron] Acionando Gateway Webhook: Daily Briefing');
+  await fetch(`${localWebhookUrl}/manual-trigger`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-cron-secret': env.CRON_SECRET },
+    body: JSON.stringify({ jobId: 'DAILY_BRIEFING' })
+  }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
 };
 
 export const runRouteRecalculationJob = async () => {
   console.log('[Cron] Executando Route Recalculation e Fechamento');
+  // Futuro: Implementar chamada de webhook para recalculo assim que o endpoint nativo existir.
 };
 
 export const runWeeklyReportJob = async () => {
-  console.log('[Cron] Geração de Relatórios em PDF (Dominical)');
-  try {
-    const athlete = await athleteRepository.getPrimaryAthlete();
-    if (!athlete) return;
-
-    const pdfBuffer = await generateLogbookPdf('Ciclo Ativo');
-    const chatId = Number(env.TELEGRAM_CHAT_ID);
-    
-    await telegramMessageService.sendPdfReport(
-      chatId, 
-      pdfBuffer, 
-      'Diario_de_Viagem.pdf', 
-      '📄 *DIÁRIO DE VIAGEM (LOGBOOK)*\n\nComandante, a operação semanal foi encerrada. Segue em anexo a topografia de Carga Aguda vs Crônica e o balanço do seu Macrociclo.'
-    );
-    console.log('[Cron] Dossiê Dominical enviado com sucesso ao Comandante!');
-  } catch (error) {
-    console.error('[Cron] Falha ao gerar e enviar o relatório semanal:', error);
-  }
+  console.log('[Cron] Acionando Gateway Webhook: Geração de Relatórios em PDF (Dominical)');
+  await fetch(`${localWebhookUrl}/weekly-report`, {
+    method: 'POST',
+    headers: { 'x-cron-secret': env.CRON_SECRET }
+  }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
 };
 
 export const startCronJobs = () => initCronJobs();

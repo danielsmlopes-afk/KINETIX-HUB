@@ -11,6 +11,7 @@ import { generateLogbookPdf } from '@/services/pdf/logbookService';
 import { generateCareerHistoryPdf } from '@/services/pdf/careerHistoryService';
 import { cardioEfficiencyService } from '@/services/pdf/cardioEfficiencyService';
 import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
+import { telegramMessageService } from '@/services/telegramMessageService';
 
 export const webhookController = {
   toggleUptime: async (c: Context) => {
@@ -117,8 +118,17 @@ export const webhookController = {
       try {
         const athlete = await athleteRepository.getPrimaryAthlete();
         const athleteId = athlete?.id || 'primary-athlete';
-        await generateLogbookPdf('Ciclo Ativo');
-        await generateCareerHistoryPdf(athleteId);
+        const chatId = Number(env.TELEGRAM_CHAT_ID);
+        
+        const logbookBuffer = await generateLogbookPdf('Ciclo Ativo');
+        if (logbookBuffer) {
+          await telegramMessageService.sendPdfReport(chatId, logbookBuffer, 'Diario_de_Viagem.pdf', '📄 *DIÁRIO DE VIAGEM (LOGBOOK)*\n\nComandante, a operação semanal foi encerrada. Segue em anexo a topografia de Carga Aguda vs Crônica e o balanço do seu Macrociclo.');
+        }
+
+        const careerBuffer = await generateCareerHistoryPdf(athleteId);
+        if (careerBuffer) {
+          await telegramMessageService.sendPdfReport(chatId, careerBuffer, 'Historico_Carreira.pdf', '🎖️ *HISTÓRICO DE COMBATE*\n\nSeu dossiê de carreira foi atualizado com sucesso.');
+        }
       } catch (error) {
         console.error('❌ [Webhook] Erro no triggerWeeklyReport:', error);
       }
@@ -136,7 +146,11 @@ export const webhookController = {
       try {
         const athlete = await athleteRepository.getPrimaryAthlete();
         const athleteId = athlete?.id || 'primary-athlete';
-        await cardioEfficiencyService.generateCardioReportPdf(athleteId, 'Geral');
+        const chatId = Number(env.TELEGRAM_CHAT_ID);
+        const cardioBuffer = await cardioEfficiencyService.generateCardioReportPdf(athleteId, 'Geral');
+        if (cardioBuffer) {
+          await telegramMessageService.sendPdfReport(chatId, cardioBuffer, 'RaioX_Cardio.pdf', '🫀 *RAIO-X CARDIOVASCULAR*\n\nAnálise de eficiência cardiorrespiratória do mês gerada com sucesso.');
+        }
       } catch (error) {
         console.error('❌ [Webhook] Erro no triggerMonthlyReport:', error);
       }
@@ -158,7 +172,11 @@ export const webhookController = {
           if (body && body.raceId) raceId = body.raceId;
         } catch (e) {} // Continua silenciosamente se não houver JSON
         
-        await generateRaceBriefingPdf(raceId);
+        const chatId = Number(env.TELEGRAM_CHAT_ID);
+        const briefingBuffer = await generateRaceBriefingPdf(raceId);
+        if (briefingBuffer) {
+          await telegramMessageService.sendPdfReport(chatId, briefingBuffer, `RaceBriefing_${raceId}.pdf`, `🎯 *PRONTUÁRIO DE PROVA: ${raceId}*\n\nTabela Smart Pace e Fatores Climáticos na Largada calculados com êxito.`);
+        }
       } catch (error) {
         console.error('❌ [Webhook] Erro no triggerRaceBriefing:', error);
       }

@@ -11,6 +11,9 @@ import { coachRoutes } from '@/routes/coachRoutes';
 import { gearRoutes } from '@/routes/gearRoutes';
 import { firebaseAuthMiddleware } from '@/config/authMiddleware';
 import { dossierController } from '@/controllers/dossierController';
+import { webhookRoutes } from '@/routes/webhookRoutes';
+import { debugRoutes } from '@/routes/debugRoutes';
+import { dossierRoutes } from '@/routes/dossierRoutes';
 
 export const apiRoutes = new Hono();
 
@@ -19,6 +22,8 @@ apiRoutes.post('/webhook/telegram', telegramController.handleWebhook);
 apiRoutes.get('/cron/daily', telegramController.handleCron);
 apiRoutes.get('/cron/recalculate', telegramController.handleRecalculate);
 apiRoutes.route('/strava', stravaRoutes);
+apiRoutes.route('/webhook', webhookRoutes);
+apiRoutes.route('/debug', debugRoutes);
 
 // 2. ROTAS PRIVADAS DO APP (Requerem Firebase Auth)
 const privateAppRoutes = new Hono();
@@ -33,6 +38,7 @@ privateAppRoutes.route('/races', racesRouter);
 privateAppRoutes.route('/import', importRoutes);
 privateAppRoutes.route('/coach', coachRoutes);
 privateAppRoutes.route('/gear', gearRoutes);
+privateAppRoutes.route('/dossiers', dossierRoutes);
 
 // Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);
