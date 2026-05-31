@@ -11,3 +11,9 @@ webhookRoutes.post('/manual-trigger', webhookController.handleManualTrigger);
 webhookRoutes.post('/weekly-report', webhookController.triggerWeeklyReport);
 webhookRoutes.post('/monthly-report', webhookController.triggerMonthlyReport);
 webhookRoutes.post('/race-briefing', webhookController.triggerRaceBriefing);
+
+// Fallback de segurança: Impede que requisições GET ou erradas
+// "vazem" para o middleware do Firebase no api.ts
+webhookRoutes.all('/*', (c) => {
+  return c.json({ error: 'Método HTTP não permitido nesta rota. Use POST.', code: 'METHOD_NOT_ALLOWED' }, 405);
+});
