@@ -155,10 +155,15 @@ export const telegramMessageService = {
         const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown> | Record<string, unknown>[];
         
         const bioP = bioSchema.safeParse(parsed);
-        if (bioP.success) {
-          await db.delete(bioimpedanceLogs).where(and(eq(bioimpedanceLogs.athleteId, athlete.id), eq(bioimpedanceLogs.date, new Date(bioP.data.date))));
-          await telemetryRepository.insertLog(athlete.id, bioP.data);
-          return sendMsg(chatId, "✅ *Bioimpedância Registrada!*");
+        const bioArrayP = z.array(bioSchema).safeParse(parsed);
+        
+        const bioData = bioP.success ? [bioP.data] : (bioArrayP.success ? bioArrayP.data : null);
+        if (bioData && bioData.length > 0) {
+          for (const bio of bioData) {
+            await db.delete(bioimpedanceLogs).where(and(eq(bioimpedanceLogs.athleteId, athlete.id), eq(bioimpedanceLogs.date, new Date(bio.date))));
+            await telemetryRepository.insertLog(athlete.id, bio);
+          }
+          return sendMsg(chatId, `✅ *Bioimpedância Registrada!* (${bioData.length} leitura(s) salva(s))`);
         }
 
         const raceP = raceSchema.safeParse(parsed);

@@ -122,8 +122,8 @@ export const telegramController = {
           return c.text('OK', 200);
         }
 
-        // Delegação para serviços existentes
-        if (text === '/briefing' || text === '/auditoria') {
+        // Delegação para serviços existentes, comandos IA (OK) e injeção de JSON (Bioimpedância/Planilhas)
+        if (text === '/briefing' || text === '/auditoria' || text === 'OK' || /[\{\[][\s\S]*[\}\]]/.test(text)) {
           await telegramMessageService.processIncomingMessage(chatId, text);
           return c.text('OK', 200);
         }

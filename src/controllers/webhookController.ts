@@ -13,11 +13,18 @@ import { cardioEfficiencyService } from '@/services/pdf/cardioEfficiencyService'
 import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
 import { telegramMessageService } from '@/services/telegramMessageService';
 import { StravaService } from '@/services/stravaService';
-import { db } from '@/db';
-import { plannedWorkouts } from '@/db/schema';
-import { eq, and, sql, isNull, gte, lte } from 'drizzle-orm';
+import { db } from '@/db'; 
+import { plannedWorkouts, workoutSessions } from '@/db/schema';
+import { eq, and, sql, isNull, gte, lte, inArray } from 'drizzle-orm';
 import { coachService } from '@/services/coachService';
 import { askHeadCoachForRecalculation } from '@/services/headCoachService';
+
+type WorkoutDetails = {
+  corrida?: string;
+  academia?: string;
+  bike?: string;
+  [key: string]: unknown;
+};
 
 export const webhookController = {
   toggleUptime: async (c: Context) => {
@@ -231,13 +238,61 @@ export const webhookController = {
           await coachService.updateComplianceStatus(workout.id, 'MISSED');
         }
 
-        // 2. Se houver falhas, invoca a IA para recalcular a rota da semana
-        const missedToday = await db.select().from(plannedWorkouts).where(
-          and(eq(plannedWorkouts.athleteId, athlete.id), sql`DATE(${plannedWorkouts.date}) = ${todayStr}`, eq(plannedWorkouts.complianceStatus, 'MISSED'))
+        // 2. Identificar falhas críticas (MISSED ou PARTIAL com volume abaixo do limiar)
+        const failedWorkouts = await db.select().from(plannedWorkouts).where(
+          and(
+            eq(plannedWorkouts.athleteId, athlete.id),
+            sql`DATE(${plannedWorkouts.date}) = ${todayStr}`,
+            inArray(plannedWorkouts.complianceStatus, ['MISSED', 'PARTIAL'])
+          )
         );
 
-        if (missedToday.length > 0) {
-          console.log(`[Webhook] ${missedToday.length} treino(s) MISSED. Acionando Head Coach para recálculo...`);
+        if (failedWorkouts.length === 0) {
+          console.log('[Webhook] Compliance 100% ou desvios toleráveis. Nenhum recálculo necessário.');
+          return;
+        }
+
+        const VOLUME_TOLERANCE_THRESHOLD = 0.8;
+        const criticalFailures: (typeof plannedWorkouts.$inferSelect)[] = [];
+
+        const executedSessions = await db.select().from(workoutSessions).where(
+          and(
+            eq(workoutSessions.athleteId, athlete.id),
+            sql`DATE(${workoutSessions.date}) = ${todayStr}`
+          )
+        );
+
+        for (const workout of failedWorkouts) {
+          if (workout.complianceStatus === 'MISSED') {
+            criticalFailures.push(workout);
+            continue;
+          }
+
+          if (workout.complianceStatus === 'PARTIAL') {
+            const executedSession = executedSessions[0];
+            if (!executedSession) continue;
+
+            let volumeExecutado = 0;
+            let volumePlanejado = 0;
+            const details = workout.details as WorkoutDetails;
+
+            if (workout.activityType === 'RUN' || workout.activityType === 'RUN_INTERVAL') {
+              volumeExecutado = executedSession.distance ? executedSession.distance / 1000 : 0;
+              const corridaStr = details?.corrida;
+              if (corridaStr) {
+                const distMatch = corridaStr.match(/([\d.,]+)\s*km/i);
+                if (distMatch) volumePlanejado = parseFloat(distMatch[1].replace(',', '.'));
+              }
+            }
+
+            if (volumePlanejado > 0 && (volumeExecutado / volumePlanejado) < VOLUME_TOLERANCE_THRESHOLD) {
+              criticalFailures.push(workout);
+            }
+          }
+        }
+
+        if (criticalFailures.length > 0) {
+          console.log(`[Webhook] ${criticalFailures.length} falha(s) crítica(s) detectada(s). Acionando Head Coach para recálculo...`);
           
           const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
           const nextWeek = new Date(tomorrow); nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
@@ -247,27 +302,22 @@ export const webhookController = {
           );
 
           const contextData = {
-            treinosPerdidos: missedToday.map(w => ({ id: w.id, type: w.activityType, title: w.title, details: w.details })),
+            treinosPerdidos: criticalFailures.map(w => ({ id: w.id, type: w.activityType, title: w.title, details: w.details, status: w.complianceStatus })),
             proximosTreinos: upcoming.map(w => ({ id: w.id, date: w.date.toISOString(), type: w.activityType, title: w.title }))
           };
 
-          const aiResponse = await askHeadCoachForRecalculation("Falha operacional hoje. Por favor, ajuste o restante da semana compensando volume perdido sem sobrecarregar.", contextData);
+          const aiResponse = await askHeadCoachForRecalculation("Falha operacional crítica hoje. Por favor, ajuste o restante da semana compensando volume perdido sem sobrecarregar.", contextData);
 
-          let updatesMsg = '';
           for (const update of aiResponse.updates) {
-            if (update.action === 'CANCEL') {
-              await db.delete(plannedWorkouts).where(eq(plannedWorkouts.id, update.id));
-              updatesMsg += `\n❌ Cancelado: ${update.notes}`;
-            } else if (update.action === 'RESCHEDULE' && update.newDate) {
-              await db.update(plannedWorkouts).set({ date: new Date(update.newDate) }).where(eq(plannedWorkouts.id, update.id));
-              updatesMsg += `\n📅 Reagendado: ${update.newDate.split('T')[0]} - ${update.notes}`;
-            }
+            if (update.action === 'CANCEL') await db.delete(plannedWorkouts).where(eq(plannedWorkouts.id, update.id));
+            else if (update.action === 'RESCHEDULE' && update.newDate) await db.update(plannedWorkouts).set({ date: new Date(update.newDate) }).where(eq(plannedWorkouts.id, update.id));
           }
 
-          const msg = `⚠️ *ROTA RECALCULADA (COMPLIANCE MISSED)* ⚠️\n\nO Head Coach detectou falha no cumprimento da missão de hoje e ajustou o seu calendário.\n\n🧠 *Parecer da IA:*\n${aiResponse.advice}\n\n⚙️ *Ações Tomadas:*${updatesMsg || '\nNenhuma alteração estrutural.'}`;
+          const updatesMsg = aiResponse.updates.map(u => `\n- ${u.action === 'CANCEL' ? '❌' : '📅'} ${u.notes}`).join('');
+          const msg = `⚠️ *ROTA RECALCULADA (FALHA CRÍTICA)* ⚠️\n\nO Head Coach detectou falha crítica no cumprimento da missão de hoje e ajustou seu calendário.\n\n🧠 *Parecer da IA:*\n${aiResponse.advice}\n\n⚙️ *Ações Tomadas:*${updatesMsg || '\nNenhuma alteração estrutural.'}`;
           await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), msg);
         } else {
-          console.log('[Webhook] Compliance 100%. Nenhum recálculo necessário.');
+          console.log('[Webhook] Desvios de compliance dentro da tolerância. Nenhum recálculo necessário.');
         }
       } catch (error) {
         console.error('❌ [Webhook] Erro no triggerRouteRecalculation:', error);
