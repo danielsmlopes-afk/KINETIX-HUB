@@ -39,7 +39,7 @@ export const athleteController = {
 
       const upcomingRaces = upcomingRacesDb.map(r => ({
         name: r.name || r.category,
-        date: new Date(r.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }),
+        date: new Date(r.date).toISOString(),
         distance: `${r.distance} km`,
         address: r.address,
         startTime: r.startTime,
