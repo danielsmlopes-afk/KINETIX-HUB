@@ -3,6 +3,7 @@ import { Context } from 'hono';
 import { db } from '@/db';
 import { athletes, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
 import { eq, desc, gte, lt, and, asc } from 'drizzle-orm';
+import { getTodayWeather, getTomorrowWeather } from '@/services/weatherService';
 
 export const athleteController = {
   async getProfile(c: Context) {
@@ -121,6 +122,12 @@ export const athleteController = {
         };
       });
 
+      // Busca do clima atualizado (Hoje e Amanhã) rodando em paralelo para não travar a API
+      const [todayWeather, tomorrowWeather] = await Promise.all([
+        getTodayWeather('São Paulo'),
+        getTomorrowWeather('São Paulo')
+      ]);
+
       // Empacota tudo para o Payload consolidado do Dashboard Mobile
       const profile = { 
         name: athlete.name, 
@@ -129,7 +136,9 @@ export const athleteController = {
         latestBioimpedance: latestBio, 
         upcomingRaces, 
         pastRaces,
-        upcomingWorkouts 
+        upcomingWorkouts,
+        todayWeather,
+        tomorrowWeather
       };
       return c.json({ data: profile }, 200);
     } catch (error) {

@@ -353,6 +353,7 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
           distance,
           "durationMinutes",
           "map_polyline" AS mapPolyline,
+          weather,
           CASE 
             WHEN distance >= 9.5 AND distance <= 10.5 THEN '10km'
             WHEN distance >= 20.5 AND distance <= 22.0 THEN '21km'
@@ -419,7 +420,7 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
       doc.moveDown(1);
       for (const pr of prRecords) {
         doc.fontSize(12).font('Helvetica-Bold').text(`${pr.year} - ${pr.distance_target}`);
-        doc.font('Helvetica').text(`Tempo Oficial: ${pr.durationMinutes} minutos | Distância Apurada: ${pr.distance} km`);
+        doc.font('Helvetica').text(`Tempo Oficial: ${pr.durationMinutes} minutos | Distância Apurada: ${pr.distance} km${pr.weather ? ` | Clima: ${pr.weather}` : ''}`);
         doc.moveDown(0.5);
         if (pr.mapImageBuffer) {
           doc.image(pr.mapImageBuffer, { fit: [450, 200], align: 'center' });

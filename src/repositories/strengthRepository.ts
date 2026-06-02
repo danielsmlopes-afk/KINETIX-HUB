@@ -93,13 +93,15 @@ export const strengthRepository = {
   async saveStrengthLog(
     athleteId: string, 
     durationMinutes: number, 
-    logs: Array<{ exerciseId: string; actualSets: number; actualReps: string; weightUsed: number; notes?: string }>
+    logs: Array<{ exerciseId: string; actualSets: number; actualReps: string; weightUsed: number; notes?: string }>,
+    weather: string | null = null
   ) {
     try {
       const [session] = await db.insert(workoutSessions).values({
         athleteId,
         date: new Date(),
-        durationMinutes
+        durationMinutes,
+        weather
       }).returning();
 
       if (logs.length > 0) {

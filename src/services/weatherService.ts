@@ -1,5 +1,10 @@
 import { env } from '@/config/env';
 
+// Controle de Cache em Memória (Evita gargalos na API OpenWeatherMap)
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutos de validade
+let todayWeatherCache: { data: string; timestamp: number; city: string } | null = null;
+let tomorrowWeatherCache: { data: string; timestamp: number; city: string } | null = null;
+
 export async function getCityFromCoordinates(lat: number, lng: number): Promise<string> {
   if (!env.OPENWEATHER_API_KEY) {
     return 'Coordenadas Recebidas (Sem API Key)';
@@ -44,7 +49,42 @@ export async function getHistoricalWeather(lat: number, lng: number, dateISO: st
   return null;
 }
 
+export async function getTodayWeather(city: string = 'São Paulo'): Promise<string> {
+  const now = Date.now();
+  if (todayWeatherCache && todayWeatherCache.city === city && (now - todayWeatherCache.timestamp < CACHE_TTL)) {
+    return todayWeatherCache.data;
+  }
+
+  if (!env.OPENWEATHER_API_KEY) {
+    return '24°C, Céu limpo (Sem API Key)';
+  }
+
+  try {
+    const url = `http://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&lang=pt_br&appid=${env.OPENWEATHER_API_KEY}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) return 'Previsão Indisponível';
+    
+    const data = await response.json();
+    
+    if (data && data.weather && data.weather.length > 0) {
+      const desc = data.weather[0].description;
+      const weatherStr = `${Math.round(data.main.temp)}°C, ${desc.charAt(0).toUpperCase() + desc.slice(1)}`;
+      todayWeatherCache = { data: weatherStr, timestamp: now, city };
+      return weatherStr;
+    }
+  } catch (error) {
+    console.error('❌ [WEATHER SERVICE] Erro ao buscar previsão do tempo de hoje:', error);
+  }
+  return 'Previsão Indisponível';
+}
+
 export async function getTomorrowWeather(city: string = 'São Paulo'): Promise<string> {
+  const now = Date.now();
+  if (tomorrowWeatherCache && tomorrowWeatherCache.city === city && (now - tomorrowWeatherCache.timestamp < CACHE_TTL)) {
+    return tomorrowWeatherCache.data;
+  }
+
   if (!env.OPENWEATHER_API_KEY) {
     return '24°C, Céu limpo (Sem API Key)';
   }
@@ -65,7 +105,9 @@ export async function getTomorrowWeather(city: string = 'São Paulo'): Promise<s
     const forecast = data.list.find((item: any) => item.dt_txt.includes(`${dateStr} 06:00:00`)) || data.list.find((item: any) => item.dt_txt.includes(dateStr));
     if (forecast) {
       const desc = forecast.weather[0].description;
-      return `${Math.round(forecast.main.temp)}°C, ${desc.charAt(0).toUpperCase() + desc.slice(1)}`;
+      const weatherStr = `${Math.round(forecast.main.temp)}°C, ${desc.charAt(0).toUpperCase() + desc.slice(1)}`;
+      tomorrowWeatherCache = { data: weatherStr, timestamp: now, city };
+      return weatherStr;
     }
   } catch (error) {
     console.error('❌ [WEATHER SERVICE] Erro ao buscar previsão do tempo:', error);

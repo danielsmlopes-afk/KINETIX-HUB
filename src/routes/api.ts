@@ -14,6 +14,7 @@ import { dossierController } from '@/controllers/dossierController';
 import { webhookRoutes } from '@/routes/webhookRoutes';
 import { debugRoutes } from '@/routes/debugRoutes';
 import { dossierRoutes } from '@/routes/dossierRoutes';
+import { workoutRoutes } from '@/routes/workoutRoutes';
 
 export const apiRoutes = new Hono();
 
@@ -39,6 +40,7 @@ privateAppRoutes.route('/import', importRoutes);
 privateAppRoutes.route('/coach', coachRoutes);
 privateAppRoutes.route('/gear', gearRoutes);
 privateAppRoutes.route('/dossiers', dossierRoutes);
+privateAppRoutes.route('/workouts', workoutRoutes);
 
 // Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);

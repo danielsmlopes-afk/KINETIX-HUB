@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { workoutSessions, strengthLogs, workoutTemplateItems, exerciseLibrary } from '@/db/schema';
 import { env } from '@/config/env';
 import { eq, and } from 'drizzle-orm';
+import { getTodayWeather, getCityFromCoordinates } from '@/services/weatherService';
 
 interface StrengthLogPayload {
   exerciseId: string;
@@ -59,6 +60,9 @@ export const strengthController = {
       const body = await c.req.json().catch(() => ({}));
       const templateName = String(body.templateName || 'Treino de Força');
       const durationMinutes = Number(body.durationMinutes || 60);
+      let location = body.location ? String(body.location) : '';
+      const lat = body.lat ? Number(body.lat) : undefined;
+      const lng = body.lng ? Number(body.lng) : undefined;
 
       // Faz a ponte inteligente caso os dados venham do App Flutter (logs) ou de outro lugar (exercises)
       const itemsToLog = (Array.isArray(body.logs) && body.logs.length > 0 ? body.logs : (body.exercises || [])) as StrengthLogPayload[];
@@ -68,11 +72,24 @@ export const strengthController = {
         return c.json({ error: "Atleta não encontrado.", code: "ATHLETE_NOT_FOUND" }, 404);
       }
 
+      // Fallback de localidade: 1º Coordenadas do App (Geolocator), 2º Âncora do Atleta
+      if (!location && lat !== undefined && lng !== undefined) {
+        location = await getCityFromCoordinates(lat, lng);
+      } else if (!location && athlete.homeLat && athlete.homeLon) {
+        location = await getCityFromCoordinates(athlete.homeLat, athlete.homeLon);
+      }
+      if (!location || location === 'Localização Mapeada' || location.includes('Sem API Key')) {
+        location = 'São Paulo'; // Fallback final
+      }
+
+      // Operação Meteorologia: Busca o clima atual do IronLog com a localidade dinâmica
+      const weatherStr = await getTodayWeather(location);
+
       // Delegação para o Repositório persistir a sessão e os logs
-      const session = await strengthRepository.saveStrengthLog(athlete.id, durationMinutes, itemsToLog);
+      const session = await strengthRepository.saveStrengthLog(athlete.id, durationMinutes, itemsToLog, weatherStr);
 
       // Notificação de Sucesso via Telegram Bot
-      const telegramMessage = `💪 *Excelente, Comandante!*\n\nO *${templateName}* foi concluído e registado com sucesso (${durationMinutes} min).\n\nContinue executando a missão.`;
+      const telegramMessage = `💪 *Excelente, Comandante!*\n\nO *${templateName}* foi concluído e registado com sucesso (${durationMinutes} min).\n🌡️ Clima do Laboratório: ${weatherStr} (${location})\n\nContinue executando a missão.`;
       await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

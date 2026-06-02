@@ -4,13 +4,13 @@ import { coachService } from '@/services/coachService';
 export const coachController = {
   async updateCompliance(c: Context) {
     try {
-      const id = c.req.param('id');
+      const body = await c.req.json().catch(() => ({}));
+      const { id, status } = body;
+      
       if (!id) {
         return c.json({ error: 'ID do treino não fornecido.', code: 'MISSING_ID' }, 400);
       }
 
-      const body = await c.req.json().catch(() => ({}));
-      const { status } = body;
       
       if (!['VALIDATED', 'MISSED', 'COMPLETED_NOT_VALIDATED'].includes(status)) {
         return c.json({ error: 'Status inválido.', code: 'INVALID_STATUS' }, 400);

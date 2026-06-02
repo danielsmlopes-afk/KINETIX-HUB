@@ -4,6 +4,7 @@ import { shoes, workoutSessions, consumables, plannedWorkouts } from '@/db/schem
 import { calculatePNL } from '@/services/loadCalculator';
 import { StravaActivity } from '@/services/stravaService';
 import { calculateAndDeductGels } from '@/services/nutritionCalculator';
+import { getHistoricalWeather, getTodayWeather } from '@/services/weatherService';
 
 export const workoutService = {
   async processStravaActivity(athleteId: string, activity: StravaActivity) {
@@ -23,6 +24,12 @@ export const workoutService = {
     const durationMinutes = Math.floor(activity.moving_time / 60);
     const pnl = calculatePNL(durationMinutes, activity.total_elevation_gain || 0);
     
+    // Busca a temperatura histórica exata baseada nas coordenadas e horário da largada
+    let weather = null;
+    if (activity.start_latlng && activity.start_latlng.length === 2) {
+      weather = await getHistoricalWeather(activity.start_latlng[0], activity.start_latlng[1], activity.start_date);
+    }
+
     await db.insert(workoutSessions).values({ 
       athleteId, 
       date: new Date(activity.start_date), 
@@ -31,7 +38,8 @@ export const workoutService = {
       distance: activity.distance,
       gearId: activity.gear_id,
       averageHeartRate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
-      mapPolyline: activity.map?.summary_polyline || null
+      mapPolyline: activity.map?.summary_polyline || null,
+      weather
     });
     console.log(`📊 Treino salvo! Duração: ${durationMinutes}min | Carga Normalizada (PNL calculada): ${pnl.toFixed(2)}`);
 
@@ -45,7 +53,7 @@ export const workoutService = {
     }
   },
 
-  async validateManualWorkout(workoutId: string, modality: string, mapPolyline?: string, distance?: number) {
+  async validateManualWorkout(workoutId: string, modality: string, mapPolyline?: string, distance?: number, weatherStr?: string) {
     // Marca o registro do plano diretamente como VALIDATED
     await db.update(plannedWorkouts)
       .set({ complianceStatus: 'VALIDATED' })
@@ -62,6 +70,7 @@ export const workoutService = {
           durationMinutes: 60, // Fallback de fallback genérico para registro manual
           distance: distance ? Number(distance) : null,
           mapPolyline: mapPolyline || null,
+          weather: weatherStr || null
         });
         console.log(`🗺️ [Soberania Cartográfica] Sessão Indoor/Virtual injetada na telemetria. Distância: ${distance || 0}m`);
       }

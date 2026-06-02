@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { workoutController } from '@/controllers/workoutController';
+import { coachController } from '@/controllers/coachController';
 import { db } from '@/db';
 import { workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -8,6 +9,7 @@ import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
 const workoutRoutes = new Hono();
 
 workoutRoutes.post('/validate-manual', workoutController.validateManual);
+workoutRoutes.post('/updateCompliance', coachController.updateCompliance);
 
 workoutRoutes.get('/:sessionId/map', async (c) => {
   const sessionId = c.req.param('sessionId');

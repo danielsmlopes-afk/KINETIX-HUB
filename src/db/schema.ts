@@ -88,6 +88,7 @@ export const workoutSessions = pgTable('workout_sessions', {
   warmup: text('warmup'),
   cooldown: text('cooldown'),
   mapPolyline: text('map_polyline'),
+  weather: text('weather'),
 });
 
 export const treadmillIntervals = pgTable('treadmill_intervals', {
