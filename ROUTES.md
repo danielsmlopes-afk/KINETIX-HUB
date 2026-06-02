@@ -69,7 +69,7 @@ Rotas de acesso e download para o Motor Vetorial de Inteligência (PDFKit/WeasyP
 - **Retorno:** Buffer de Arquivo Binário (`application/pdf`).
 
 ### `GET /api/reports/cardio/current`
-- **Descrição:** Gera e baixa o Raio-X Cardiovascular do mês em curso (Gráfico de Dispersão FC vs Pace).
+- **Descrição:** Gera e baixa o Raio-X Cardiovascular do mês em curso (Gráfico de Dispersão FC vs Pace alimentado por telemetria real via JOIN entre `workout_sessions` e `planned_workouts`).
 - **Autenticação:** Híbrida.
 - **Retorno:** Buffer de Arquivo Binário (`application/pdf`).
 

@@ -18,3 +18,6 @@ A tabela `planned_workouts` pode ter sua coluna `complianceStatus` alterada expl
 
 ## Emissão Nativa de Relatórios (Operação Bypass)
 Os endpoints que emitem binários em Buffer (PDFs) extraídos destas tabelas aceitam validação JWT na string da URL (`?token=`), facilitando requisições sem `Headers` rígidos disparadas pelas WebViews ou visualizadores nativos do Flutter.
+
+## Junção Analítica de Telemetria (Cardio Efficiency)
+O motor de PDF (`cardioEfficiencyService.ts`) efetua um `innerJoin` rigoroso entre `workout_sessions` e `planned_workouts` interceptando a âncora relacional `athleteId` e o mapeamento temporal (função estrita `DATE()`). Isso assegura que as métricas injetadas no Gráfico de Dispersão (Pace vs. Frequência Cardíaca Média) representem exclusivamente missões chanceladas de corrida ao ar livre ou esteira (RUN).

@@ -1,7 +1,52 @@
 import PDFDocument from 'pdfkit';
 import { Buffer } from 'buffer';
+import { db } from '@/db';
+import { workoutSessions, athletes } from '@/db/schema';
+import { eq, gte, and } from 'drizzle-orm';
 
 export async function generateLogbookPdf(cycleId: string): Promise<Buffer> {
+  const athleteList = await db.select().from(athletes).limit(1);
+  let acwrData: number[] = [];
+
+  if (athleteList.length > 0) {
+    const athlete = athleteList[0];
+    const today = new Date();
+    const daysToFetch = 16 * 7; // 12 semanas + 4 para cálculo Crônico
+    const cutoffDate = new Date(today.getTime() - daysToFetch * 24 * 60 * 60 * 1000);
+
+    const sessions = await db.select().from(workoutSessions).where(
+      and(
+        eq(workoutSessions.athleteId, athlete.id),
+        gte(workoutSessions.date, cutoffDate)
+      )
+    );
+
+    const weeklyLoads: number[] = new Array(16).fill(0);
+
+    for (const session of sessions) {
+      const daysDiff = Math.floor((today.getTime() - session.date.getTime()) / (1000 * 60 * 60 * 24));
+      const weekIndex = 15 - Math.floor(daysDiff / 7);
+      
+      if (weekIndex >= 0 && weekIndex < 16) {
+        const load = (session.distance !== null && session.distance > 0) 
+          ? (session.distance / 1000) 
+          : session.durationMinutes;
+        weeklyLoads[weekIndex] += load;
+      }
+    }
+
+    for (let i = 4; i < 16; i++) {
+      const acute = weeklyLoads[i];
+      const chronic = (weeklyLoads[i-1] + weeklyLoads[i-2] + weeklyLoads[i-3] + weeklyLoads[i-4]) / 4;
+      const acwr = chronic > 0 ? (acute / chronic) : (acute > 0 ? 1.5 : 0);
+      acwrData.push(acwr);
+    }
+  }
+
+  if (acwrData.length <= 1) {
+    acwrData = new Array(12).fill(0);
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50 });
@@ -22,8 +67,6 @@ export async function generateLogbookPdf(cycleId: string): Promise<Buffer> {
       const chartHeight = 200;
       const chartBottom = chartY + chartHeight;
 
-      // Mock Array de 16 semanas (Agudo vs Crônico)
-      const acwrData = [0.8, 0.9, 1.1, 1.3, 1.0, 0.8, 0.7, 1.2, 1.6, 1.4, 1.1, 0.9, 1.0, 1.2, 1.3, 1.1];
       const maxAcwr = 2.0; // Teto do eixo Y
       const stepX = chartWidth / (acwrData.length - 1);
 

@@ -260,7 +260,7 @@ O motor vetorial expõe relatórios dinâmicos diretamente em *Buffer* binário,
 * **`GET /api/reports/logbook/latest`**: Baixa o Diário de Viagem em PDF (Gráfico ACWR).
 * **`GET /api/reports/career/me`**: Baixa o Histórico de Combate em PDF.
 * **`GET /api/reports/race/next`**: Baixa o Prontuário de Missão P1 (Checklist & Smart Pace).
-* **`GET /api/reports/cardio/current`**: Baixa o Raio-X Cardiovascular do Mês em PDF.
+* **`GET /api/reports/cardio/current`**: Baixa o Raio-X Cardiovascular do Mês em PDF (Agora operando com dados reais extraídos via Join de telemetria).
 * **`GET /api/reports/strength-audit/:sessionId`**: Baixa a auditoria rigorosa de um treino do IronLog.
 
 ---

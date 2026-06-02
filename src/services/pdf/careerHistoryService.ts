@@ -1,26 +1,29 @@
 import PDFDocument from 'pdfkit';
 import { db } from '@/db';
 import { workoutSessions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNotNull, sql } from 'drizzle-orm';
 
 export async function generateCareerHistoryPdf(athleteId: string): Promise<Buffer> {
   try {
-    // 1. Busca o histórico real de sessões do atleta
-    const sessions = await db.select().from(workoutSessions)
-      .where(eq(workoutSessions.athleteId, athleteId));
+    // 1. Busca e agrupa o volume consolidado (em km) por ano diretamente no Banco de Dados (Neon DB)
+    const aggregatedSessions = await db.select({
+      year: sql<number>`EXTRACT(YEAR FROM ${workoutSessions.date})::int`,
+      totalDistance: sql<number>`SUM(${workoutSessions.distance})`
+    })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.athleteId, athleteId),
+        isNotNull(workoutSessions.distance),
+        sql`${workoutSessions.distance} > 0`
+      )
+    )
+    .groupBy(sql`EXTRACT(YEAR FROM ${workoutSessions.date})`)
+    .orderBy(sql`EXTRACT(YEAR FROM ${workoutSessions.date})`);
 
-    // 2. Agrupa o volume (em km) por ano
-    const volumeByYear: Record<string, number> = {};
-    sessions.forEach(s => {
-      const year = s.date.getFullYear().toString();
-      const km = (s.distance || 0) / 1000;
-      if (!volumeByYear[year]) volumeByYear[year] = 0;
-      volumeByYear[year] += km;
-    });
-
-    let annualData = Object.keys(volumeByYear).sort().map(year => ({
-      year,
-      volume: Math.round(volumeByYear[year])
+    let annualData = aggregatedSessions.map(s => ({
+      year: s.year.toString(),
+      volume: Math.round((s.totalDistance || 0) / 1000)
     }));
 
     // Se não houver dados, garante que o gráfico renderize o ano atual zerado

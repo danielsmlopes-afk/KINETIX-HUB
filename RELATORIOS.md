@@ -8,8 +8,6 @@ O Motor de Relatórios do KINETIX HUB foi projetado para gerar narrativas visuai
 
 > **Nota de Arquitetura V11.1:** Os relatórios em PDF e os motores de briefings táticos agora buscam os dados da tabela `planned_workouts` de forma totalmente segmentada. O motor de extração mapeia cada modalidade individualmente pelas propriedades `{ corrida, academia, bike }` dentro do campo JSONB `details`, abandonando completamente o uso da antiga chave genérica `description`.
 
-> **Operação Bypass (V12):** Para mitigar o erro 401 (Unauthorized) ocasionado pela falta de suporte a headers de rede durante a abertura de PDFs no SDK mobile (`url_launcher` / `SfPdfViewer`), a API e o motor vetorial aceitam a autenticação Híbrida, injetando o JWT validado na Query String da chamada HTTP (`?token=<token>`).
-
 > **Soberania Cartográfica (MapStatic + Redis):** A renderização não utiliza motores front-end de mapas e não compartilha dados de localização externamente. O serviço consulta um contêiner nativo `stefanocudini/docker-mapstatic` na rede, guarda o `Buffer` localmente no Redis via LRU, e injeta o objeto nativo como imagem pura no PDF.
 
 ## 📂 Estrutura de Arquivos
@@ -34,7 +32,8 @@ kinetix-api/
 ## 🚀 Fases de Implantação
  1. **Fase 1: Infraestrutura e Stubs:** Criação das pastas, definição dos controladores HTTP, injeção das rotas e webhooks, e criação dos esqueletos dos 4 serviços de PDF.
  2. **Fase 2: Motor de Topografia (Logbook):** Implementação do cálculo de Normalização de Escala (inversão do Eixo Y) e desenho do gráfico de área vetorial do ACWR (Agudo vs Crônico).
- 3. **Fase 3: Geometria Avançada (Lote Final):** Injeção de loops geométricos para criação de tabelas sem bordas (Race Briefing), normalização de larguras para gráficos de barras (Career History) e plotagem com doc.circle para análise aeróbica (Cardio).
+ 3. **Fase 3: Geometria Avançada:** Injeção de loops geométricos para criação de tabelas sem bordas e gráficos de barras (Career History).
+ 4. **Fase 4: Injeção de Telemetria Real (Cardio):** O `cardioEfficiencyService.ts` opera via Drizzle ORM efetuando um Join rigoroso de `workoutSessions` e `plannedWorkouts` para mapear dados biológicos diretos no Gráfico de Dispersão Vetorial (Fogo Real).
 ## 🤖 Prompts Globais para IA (Gemini Code Assist)
 Para recriar ou atualizar o sistema na IDE, utilize os prompts estruturados abaixo na ordem indicada.
 ### 📥 PROMPT 1: Infraestrutura, Stubs e Rotas

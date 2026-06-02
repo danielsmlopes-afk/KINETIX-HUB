@@ -1,6 +1,21 @@
 import PDFDocument from 'pdfkit';
+import { db } from '@/db';
+import { races } from '@/db/schema';
+import { eq, and, gte, asc, or } from 'drizzle-orm';
 
-export function generateRaceBriefingPdf(raceId: string): Promise<Buffer> {
+export async function generateRaceBriefingPdf(raceId?: string): Promise<Buffer> {
+  const today = new Date();
+  
+  const upcomingRaces = await db.select().from(races).where(
+    and(
+      or(eq(races.priority, 'P1'), eq(races.category, 'P1')),
+      eq(races.isTarget, true),
+      gte(races.date, today)
+    )
+  ).orderBy(asc(races.date)).limit(1);
+
+  const targetRace = upcomingRaces.length > 0 ? upcomingRaces[0] : null;
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -9,8 +24,17 @@ export function generateRaceBriefingPdf(raceId: string): Promise<Buffer> {
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-      doc.fontSize(20).fillColor('#333333').text(`Race Briefing: Tabela Smart Pace (${raceId})`, { align: 'center' });
-      doc.moveDown(2);
+      if (!targetRace) {
+        doc.fontSize(20).fillColor('#e74c3c').text('NENHUMA MISSÃO P1 ENCONTRADA', { align: 'center' });
+        doc.end();
+        return;
+      }
+
+      const raceName = targetRace.name || targetRace.category;
+      const raceDateStr = targetRace.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+      doc.fontSize(20).fillColor('#333333').text(`Race Briefing: Tabela Smart Pace`, { align: 'center' });
+      doc.fontSize(12).fillColor('#666666').text(`Operação: ${raceName} | Data: ${raceDateStr} às ${targetRace.startTime} | Distância: ${targetRace.distance}km`, { align: 'center' });
 
       const startX = 50, startY = 150, rowHeight = 30;
       const col1 = 60, col2 = 200, col3 = 350;
@@ -25,15 +49,30 @@ export function generateRaceBriefingPdf(raceId: string): Promise<Buffer> {
       let currentY = startY + rowHeight;
       doc.font('Helvetica').fillColor('#333333');
 
-      // Iteração Matemática (Tabela de Passagens do KM 1 ao 5)
-      const targetPaceSeconds = 5 * 60; // Pace Base: 5:00 min/km
+      let targetPaceSeconds = 5 * 60;
+      let paceStr = '5:00';
+      if (targetRace.targetPace) {
+        const paceMatch = targetRace.targetPace.match(/(\d+):(\d{2})/);
+        if (paceMatch) {
+          targetPaceSeconds = parseInt(paceMatch[1], 10) * 60 + parseInt(paceMatch[2], 10);
+          paceStr = targetRace.targetPace;
+        }
+      }
 
-      for (let km = 1; km <= 5; km++) {
+      // Iteração Matemática Dinâmica
+      const limitKm = Math.floor(targetRace.distance);
+
+      for (let km = 1; km <= limitKm; km++) {
+        if (currentY > 750) {
+          doc.addPage();
+          currentY = 50;
+        }
+
         // Linha divisória fina simulando borda da tabela
         doc.moveTo(startX, currentY + rowHeight).lineTo(545, currentY + rowHeight).lineWidth(0.5).stroke('#cccccc');
 
         doc.text(`KM ${km}`, col1, currentY + 10);
-        doc.text('5:00', col2, currentY + 10);
+        doc.text(paceStr, col2, currentY + 10);
         
         // Cálculo Aritmético do Relógio Acumulado
         const totalSeconds = targetPaceSeconds * km;
@@ -44,8 +83,14 @@ export function generateRaceBriefingPdf(raceId: string): Promise<Buffer> {
         currentY += rowHeight;
       }
       
+      doc.y = currentY;
+      if (doc.y > 750) {
+        doc.addPage();
+        doc.y = 50;
+      }
+
       doc.moveDown(2).fontSize(14).font('Helvetica-Bold').text('Condições Climáticas Esperadas:');
-      doc.font('Helvetica').fontSize(12).text('Temperatura na Largada: 18°C | Umidade: 65%');
+      doc.font('Helvetica').fontSize(12).text(targetRace.weather || 'Temperatura na Largada: 18°C | Umidade: 65%');
       doc.end();
     } catch (error) { reject(error); }
   });

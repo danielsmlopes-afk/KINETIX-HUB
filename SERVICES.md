@@ -16,3 +16,6 @@ O `authMiddleware.ts` atua como o portão de segurança do Hono. Para garantir a
 
 ## Motor Vetorial Cartográfico (MapStatic) e Cache em Redis
 Os motores de geração de dossiês (`pdfGeneratorService.ts`) executam o serviço `fetchMapStaticBuffer` para buscar imagens de trajetos sem vazar dados para a web externa. As polylines extraídas da tabela `workout_sessions` realizam uma chamada HTTP nativa que intercepta a variável `MAPSTATIC_URL`. O serviço emprega o sistema de cache no Redis para mapear requests repetitivos em buffer de memória, garantindo alta performance e segurança.
+
+## Motor Analítico de Dispersão (Cardio Efficiency)
+O serviço `cardioEfficiencyService.ts` foi promovido para "Operação Fogo Real". Ele abandonou os stubs de dados estáticos e agora orquestra a extração e transformação puramente matemática dos registros reais em banco (`workoutSessions.durationMinutes`, `distance`, `averageHeartRate`), traduzindo variáveis fisiológicas complexas diretamente para o plano cartesiano bidimensional (`pdfkit`).
