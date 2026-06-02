@@ -1,7 +1,9 @@
-import { InferSelectModel } from 'drizzle-orm';
-import { plannedWorkouts } from '../db/schema';
+import { InferSelectModel, and, eq, gte, lte } from 'drizzle-orm';
+import { plannedWorkouts, athletes } from '../db/schema';
+import { db } from '@/db';
 import { askHeadCoach } from './headCoachService';
 import { env } from '@/config/env';
+import { getTomorrowWeather } from './weatherService';
 
 // Tipagem estrita inferida do Drizzle ORM (Zero 'any')
 type PlannedWorkout = InferSelectModel<typeof plannedWorkouts>;
@@ -66,8 +68,52 @@ Use um tom clínico, focado em performance e proteção.`;
     const seriePrincipal = seriePrincipalParts.length > 0 ? seriePrincipalParts.join(' + ') : 'Treino Base';
     const restDetails = details?.restDetails ?? null;
 
+    // PARTE 1.5: Motor de Sumário Tático (Calcula a cadência da semana corrente)
+    let tacticalSummary = '';
+    try {
+      const workoutDate = new Date(workout.date);
+      const startOfWeek = new Date(workoutDate);
+      startOfWeek.setUTCDate(workoutDate.getUTCDate() - workoutDate.getUTCDay()); // Retrocede ao Domingo
+      startOfWeek.setUTCHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6); // Avança ao Sábado
+      endOfWeek.setUTCHours(23, 59, 59, 999);
+
+      const weekWorkouts = await db.select().from(plannedWorkouts).where(
+        and(
+          eq(plannedWorkouts.athleteId, workout.athleteId),
+          gte(plannedWorkouts.date, startOfWeek),
+          lte(plannedWorkouts.date, endOfWeek)
+        )
+      );
+
+      let totalKm = 0;
+      let strengthSessions = 0;
+      let bikeSessions = 0;
+      
+      for (const w of weekWorkouts) {
+        const wDetails = w.details as { corrida?: string; academia?: string; bike?: string } | null;
+        if (wDetails?.corrida && wDetails.corrida.trim() !== '' && wDetails.corrida.trim().toLowerCase() !== 'null' && wDetails.corrida.trim().toUpperCase() !== 'OFF') {
+          const match = wDetails.corrida.match(/(\d+(?:[\.,]\d+)?)\s*km/i);
+          if (match) totalKm += parseFloat(match[1].replace(',', '.'));
+        }
+        if (wDetails?.academia && wDetails.academia.trim() !== '' && wDetails.academia.trim().toLowerCase() !== 'null' && wDetails.academia.trim().toUpperCase() !== 'OFF') {
+          strengthSessions++;
+        }
+        if (wDetails?.bike && wDetails.bike.trim() !== '' && wDetails.bike.trim().toLowerCase() !== 'null' && wDetails.bike.trim().toUpperCase() !== 'OFF') {
+          bikeSessions++;
+        }
+      }
+      tacticalSummary = `\n📊 SUMÁRIO TÁTICO DA SEMANA:\n🏃 Pista: ${totalKm > 0 ? totalKm.toFixed(1) + ' KM' : '-'} | 🏋️ Força: ${strengthSessions} Sessão(ões) | 🚴 Base: ${bikeSessions} Sessão(ões)\n`;
+    } catch (error) {
+      console.error('❌ [BriefingService] Erro ao calcular Sumário Tático:', error);
+    }
+
     // Chamada ao Motor Cognitivo (IA Gemini via askHeadCoach)
     const popStr = await this.getWeatherPoP();
+    const visualWeather = await getTomorrowWeather(); // Integração de Log Visual via OpenWeatherMap
+    
     const systemPrompt = this.getLogisticsSystemPrompt();
     const userPrompt = `Alvo: ${workout.title}\nTipo: ${workout.activityType}\nSérie Principal: ${seriePrincipal}`;
     const aiResponse = await askHeadCoach(userPrompt, undefined, systemPrompt);
@@ -80,7 +126,8 @@ Use um tom clínico, focado em performance e proteção.`;
    ⏸️ Protocolo de Repouso: ${escapeMarkdown(restDetails)}
    ❄️ Resfriamento: ${escapeMarkdown(workout.cooldown)}
    ${escapeMarkdown(popStr)}
-   
+   ☁️ Visual Climático: ${escapeMarkdown(visualWeather)}
+${escapeMarkdown(tacticalSummary)}
 🎒 ARSENAL LOGÍSTICO & MACROCICLO:
 ${escapeMarkdown(aiResponse)}`;
 
@@ -92,7 +139,34 @@ ${escapeMarkdown(aiResponse)}`;
    */
   public async executeBriefing(): Promise<void> {
     console.log('[BriefingService] Executando varredura de briefing diário...');
-    // TODO: Implementar busca do treino do dia seguinte e disparar generateNightlyBriefing
+    try {
+      const athleteList = await db.select().from(athletes).limit(1);
+      if (athleteList.length === 0) return;
+      const athlete = athleteList[0];
+
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const tomorrow = new Date(`${todayStr}T00:00:00Z`);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+      const endOfTomorrow = new Date(tomorrow);
+      endOfTomorrow.setUTCHours(23, 59, 59, 999);
+
+      const workouts = await db.select().from(plannedWorkouts).where(
+        and(eq(plannedWorkouts.athleteId, athlete.id), gte(plannedWorkouts.date, tomorrow), lte(plannedWorkouts.date, endOfTomorrow))
+      ).limit(1);
+
+      if (workouts.length > 0) {
+        const briefingMarkdown = await this.generateNightlyBriefing(workouts[0]);
+        if (env.TELEGRAM_CHAT_ID && env.TELEGRAM_BOT_TOKEN) {
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: briefingMarkdown, parse_mode: 'MarkdownV2' })
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ [BriefingService] Falha na execução do Briefing:', error);
+    }
   }
 }
 

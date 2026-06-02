@@ -70,11 +70,14 @@ const generateWorkoutRows = (workouts: PlannedWorkout[]): string => {
     rows += `
       <tr>
         <td>
-          <div style="margin-bottom: 2px;"><strong>${w.date}</strong></div>
-          <div style="font-size: 6.5pt; color: #a0aec0;">${w.day}</div>
+          <div style="margin-bottom: 2px; color: #06b6d4; font-weight: 800; font-size: 9pt;">${w.date}</div>
+          <div style="font-size: 6.5pt; color: #64748b; text-transform: uppercase; font-weight: bold;">${w.day}</div>
         </td>
         <td>
-          <div style="margin-bottom: 4px;"><strong>${sanitizeValue(w.name)}</strong></div>
+          <div style="margin-bottom: 6px;">
+            <span style="display: inline-block; width: 3px; height: 10px; background-color: #06b6d4; vertical-align: middle; margin-right: 4px; border-radius: 1px;"></span>
+            <strong style="vertical-align: middle; font-size: 8pt; color: #f8fafc;">${sanitizeValue(w.name)}</strong>
+          </div>
           ${getBadge(w.name, w.corrida)}
         </td>
         <td>${sanitizeValue(w.warmup)}</td>
@@ -107,16 +110,17 @@ const getHtmlTemplate = (title: string, body: string, footer: string = '') => `<
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <title>Relatório Tático de Macrociclo</title>
   <style>
     @page {
       size: A4 portrait;
       margin: 12mm 10mm;
-      background-color: #1a202c;
+      background-color: #0f172a;
     }
     body {
-      background-color: #1a202c;
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      font-family: 'Inter', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
       color: #e2e8f0;
       font-size: 7.5pt;
       line-height: 1.4;
@@ -125,37 +129,39 @@ const getHtmlTemplate = (title: string, body: string, footer: string = '') => `<
     }
     p, tr, td, th, div { orphans: 3; widows: 3; }
     
-    .header-banner { background-color: #2d3748; border-bottom: 3px solid #ed8936; padding: 12px; text-align: center; margin-bottom: 15px; }
-    .header-banner h1 { font-size: 14pt; font-weight: 700; text-transform: uppercase; margin: 0; color: #e2e8f0; }
+    .header-banner { padding: 0 0 12px 0; border-bottom: 2px solid #06b6d4; text-align: left; margin-bottom: 20px; background-color: transparent; }
+    .header-banner h1 { font-size: 16pt; font-weight: 800; text-transform: uppercase; margin: 0; color: #f8fafc; letter-spacing: 1.5px; }
+    .header-banner .subtitle { font-size: 7pt; color: #06b6d4; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; font-weight: bold; }
     
-    .telemetry-card { display: table; width: 100%; background-color: #2d3748; margin-bottom: 15px; page-break-inside: avoid; }
-    .telemetry-cell { display: table-cell; padding: 10px; vertical-align: middle; text-align: center; border-right: 1px solid #4a5568; }
+    .telemetry-card { display: table; width: 100%; background-color: #1e293b; margin-bottom: 15px; page-break-inside: avoid; border-radius: 4px; border-left: 4px solid #06b6d4; }
+    .telemetry-cell { display: table-cell; padding: 12px 10px; vertical-align: middle; text-align: center; border-right: 1px solid rgba(255, 255, 255, 0.05); }
     .telemetry-cell:last-child { border-right: none; }
-    .telemetry-label { font-size: 6.5pt; color: #a0aec0; text-transform: uppercase; margin-bottom: 3px; }
-    .telemetry-value { font-size: 9pt; font-weight: bold; color: #e2e8f0; }
+    .telemetry-label { font-size: 6.5pt; color: #64748b; text-transform: uppercase; margin-bottom: 3px; font-weight: bold; letter-spacing: 0.5px; }
+    .telemetry-value { font-size: 9.5pt; font-weight: 800; color: #f8fafc; }
     
-    table.workouts-table { width: 100%; border-collapse: collapse; background-color: #2d3748; }
-    table.workouts-table th { background-color: #4a5568; text-transform: uppercase; font-weight: bold; text-align: left; }
-    table.workouts-table th, table.workouts-table td { border: 1px solid #4a5568; padding: 6px 5px; }
+    table.workouts-table { width: 100%; border-collapse: collapse; background-color: transparent; margin-bottom: 15px; }
+    table.workouts-table th { background-color: transparent; text-transform: uppercase; font-weight: 800; text-align: left; font-size: 6pt; letter-spacing: 1px; color: #64748b; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding: 8px; }
+    table.workouts-table td { border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 12px 8px; vertical-align: top; }
     table.workouts-table tr { page-break-inside: avoid; }
-    table.workouts-table tr:nth-child(even) { background-color: #232d3f; }
+    table.workouts-table tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.015); }
     
-    .badge { padding: 2px 4px; border-radius: 3px; font-size: 6.5pt; font-weight: bold; text-transform: uppercase; display: inline-block; }
-    .badge-quality { background-color: #742a2a; color: #feb2b2; }
-    .badge-endurance { background-color: #744210; color: #fbd38d; }
-    .badge-locked { background-color: #4a5568; color: #a0aec0; }
-    .badge-easy { background-color: #2b6cb0; color: #90cdf4; }
-    .badge-recovery { background-color: #234e52; color: #81e6d9; }
-    .badge-goal { background-color: #dd6b20; color: #fffff0; }
+    .badge { padding: 3px 6px; border-radius: 12px; font-size: 6pt; font-weight: 800; text-transform: uppercase; display: inline-block; letter-spacing: 0.5px; border: 1px solid transparent; }
+    .badge-quality { background-color: rgba(225, 29, 72, 0.15); color: #fb7185; border-color: rgba(225, 29, 72, 0.3); }
+    .badge-endurance { background-color: rgba(217, 119, 6, 0.15); color: #fbbf24; border-color: rgba(217, 119, 6, 0.3); }
+    .badge-locked { background-color: rgba(71, 85, 105, 0.15); color: #94a3b8; border-color: rgba(71, 85, 105, 0.3); }
+    .badge-easy { background-color: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
+    .badge-recovery { background-color: rgba(6, 182, 212, 0.15); color: #22d3ee; border-color: rgba(6, 182, 212, 0.3); }
+    .badge-goal { background-color: rgba(249, 115, 22, 0.15); color: #fdba74; border-color: rgba(249, 115, 22, 0.3); }
     
-    .null-val { color: #718096; font-style: italic; }
-    .sparkline-container { background-color: #1a202c; height: 3px; width: 100%; margin-top: 4px; }
-    .sparkline-fill { background-color: #ed8936; height: 100%; }
+    .null-val { color: #334155; font-size: 8px; font-style: italic; }
+    .sparkline-container { background-color: rgba(255, 255, 255, 0.05); height: 4px; width: 100%; margin-top: 6px; border-radius: 2px; overflow: hidden; }
+    .sparkline-fill { background-color: #06b6d4; height: 100%; }
   </style>
 </head>
 <body>
   <div class="header-banner">
     <h1>${title}</h1>
+    <div class="subtitle">CONFIDENTIAL TACTICAL BRIEFING - KINETIX HUB</div>
   </div>
   <div class="telemetry-card">
     <div class="telemetry-cell"><div class="telemetry-label">SISTEMA</div><div class="telemetry-value">BioMedal V11</div></div>
@@ -168,8 +174,32 @@ const getHtmlTemplate = (title: string, body: string, footer: string = '') => `<
 </html>`;
 
 const generateWeeklyPlanHtml = (workouts: PlannedWorkout[], footer: string = ''): string => {
+  let totalKm = 0;
+  let strengthSessions = 0;
+  let bikeSessions = 0;
+
+  for (const w of workouts) {
+    if (w.corrida && w.corrida.trim() !== '' && w.corrida.trim().toLowerCase() !== 'null' && w.corrida.trim().toUpperCase() !== 'OFF') {
+      const match = w.corrida.match(/(\d+(?:[\.,]\d+)?)\s*km/i);
+      if (match) {
+        totalKm += parseFloat(match[1].replace(',', '.'));
+      }
+    }
+    if (w.academia && w.academia.trim() !== '' && w.academia.trim().toLowerCase() !== 'null' && w.academia.trim().toUpperCase() !== 'OFF') {
+      strengthSessions++;
+    }
+    if (w.bike && w.bike.trim() !== '' && w.bike.trim().toLowerCase() !== 'null' && w.bike.trim().toUpperCase() !== 'OFF') {
+      bikeSessions++;
+    }
+  }
+
   const rows = generateWorkoutRows(workouts);
   const body = `
+  <div class="telemetry-card">
+    <div class="telemetry-cell"><div class="telemetry-label">VOLUME DE PISTA</div><div class="telemetry-value">${totalKm > 0 ? totalKm.toFixed(1) + ' KM Estimados' : '-'}</div></div>
+    <div class="telemetry-cell"><div class="telemetry-label">LABORATÓRIO DE FORÇA</div><div class="telemetry-value">${strengthSessions} Sess${strengthSessions === 1 ? 'ão' : 'ões'}</div></div>
+    <div class="telemetry-cell"><div class="telemetry-label">ENGENHARIA DE BASE</div><div class="telemetry-value">${bikeSessions} Sess${bikeSessions === 1 ? 'ão' : 'ões'}</div></div>
+  </div>
   <table class="workouts-table">
     <thead><tr><th style="width: 8%;">Data</th><th style="width: 16%;">Missão</th><th style="width: 12%;">Aquecimento</th><th style="width: 12%;">Desaquecimento</th><th style="width: 12%;">Repouso</th><th style="width: 15%;">Corrida</th><th style="width: 12%;">Academia</th><th style="width: 13%;">Bike</th></tr></thead>
     <tbody>${rows}</tbody>
