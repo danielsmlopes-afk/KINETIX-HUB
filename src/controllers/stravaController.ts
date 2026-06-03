@@ -6,7 +6,7 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { db } from '@/db';
 import { plannedWorkouts } from '@/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { StravaService } from '@/services/stravaService';
+import { StravaService, StravaActivity } from '@/services/stravaService';
 import { telegramMessageService } from '@/services/telegramMessageService';
 
 type StravaWebhookPayload = {
@@ -62,20 +62,32 @@ export const stravaController = {
       return;
     }
 
-    const tokenRes = await fetch('https://www.strava.com/api/v3/oauth/token', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET, refresh_token: env.STRAVA_REFRESH_TOKEN, grant_type: 'refresh_token' })
-    });
-    
-    const tokenData = await tokenRes.json() as { access_token: string };
-    if (!tokenData.access_token) throw new Error('Falha ao obter Access Token.');
+    let tokenData: { access_token: string };
+    let activity: Record<string, unknown>;
 
-    const activityRes = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` }
-    });
-    
-    if (!activityRes.ok) throw new Error(`API do Strava rejeitou requisição: ${activityRes.status}`);
-    const activity = await activityRes.json() as Record<string, unknown>;
+    try {
+      const tokenRes = await fetch('https://www.strava.com/api/v3/oauth/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET, refresh_token: env.STRAVA_REFRESH_TOKEN, grant_type: 'refresh_token' })
+      });
+      if (!tokenRes.ok) throw new Error(`Token endpoint HTTP ${tokenRes.status}`);
+      tokenData = await tokenRes.json() as { access_token: string };
+      if (!tokenData.access_token) throw new Error('Token ausente no payload.');
+    } catch (error) {
+      console.error('❌ [Strava] API Indisponível (Falha ao obter Access Token):', error);
+      return;
+    }
+
+    try {
+      const activityRes = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` }
+      });
+      if (!activityRes.ok) throw new Error(`Activity endpoint HTTP ${activityRes.status}`);
+      activity = await activityRes.json() as Record<string, unknown>;
+    } catch (error) {
+      console.error(`❌ [Strava] API Indisponível (Falha ao buscar Atividade ${activityId}):`, error);
+      return;
+    }
 
     if (activity.type !== 'Run') {
       console.log(`[Strava] Operação ignorada. Atividade não é corrida (Tipo: ${activity.type}).`);
@@ -94,7 +106,7 @@ export const stravaController = {
     }
 
     // DESPACHANTE LOGÍSTICO (NÃO-BLOQUEANTE): Dedução de Arsenal (Tênis) e Estoque (Géis)
-    workoutService.processStravaActivity(athlete.id, activity as any).catch(err => {
+    workoutService.processStravaActivity(athlete.id, activity as unknown as StravaActivity).catch(err => {
       console.error('❌ [Strava] Erro ao processar logística de Arsenal/Géis:', err);
     });
 
@@ -119,7 +131,7 @@ export const stravaController = {
       return;
     }
 
-    const details = plannedRun.details as any;
+    const details = plannedRun.details as { corrida?: string };
     let targetDistanceKm = 0;
     let targetPaceStr = '';
 
@@ -131,27 +143,37 @@ export const stravaController = {
       if (paceMatch) targetPaceStr = paceMatch[1];
     }
 
-    // Delegação para o novo Protocolo de Esteira Calibrada (V2)
-    const auditResult = await coachService.auditWorkout(
-      activity as any,
-      plannedRun.id,
-      targetDistanceKm,
-      targetPaceStr
-    );
+    let auditResult = { complianceStatus: 'COMPLETED_NOT_VALIDATED', feedback: 'Auditoria não realizada.' };
+    try {
+      // Delegação para o novo Protocolo de Esteira Calibrada (V2)
+      auditResult = await coachService.auditWorkout(
+        activity as unknown as StravaActivity,
+        plannedRun.id,
+        targetDistanceKm,
+        targetPaceStr
+      );
+    } catch (error) {
+      console.error('❌ [Strava] Erro fatal durante auditoria via Head Coach:', error);
+      auditResult.feedback = 'Falha sistêmica durante a auditoria (Motor Cognitivo/DB).';
+    }
 
-    // 🚨 Notificação instantânea da Auditoria no Telegram com o Motivo
-    let statusEmoji = '✅';
-    if (auditResult.complianceStatus === 'PARTIAL') statusEmoji = '⚠️';
-    else if (auditResult.complianceStatus === 'COMPLETED_NOT_VALIDATED') statusEmoji = '❌';
+    // 🚨 Notificação instantânea da Auditoria no Telegram com Circuit Breaker
+    try {
+      let statusEmoji = '✅';
+      if (auditResult.complianceStatus === 'PARTIAL') statusEmoji = '⚠️';
+      else if (auditResult.complianceStatus === 'COMPLETED_NOT_VALIDATED') statusEmoji = '❌';
 
-    const auditMsg = `🏃‍♂️ *AUDITORIA DE COMBATE (STRAVA)* 🏃‍♂️\n\n` +
-      `*Missão:* ${activity.name}\n` +
-      `*Distância:* ${distanceKm}km\n` +
-      `*Pace Médio:* ${paceMins}:${paceSecs}/km\n` +
-      `*Status:* ${statusEmoji} ${auditResult.complianceStatus}\n\n` +
-      `*Parecer do Head Coach:*\n_${auditResult.feedback}_`;
+      const auditMsg = `🏃‍♂️ *AUDITORIA DE COMBATE (STRAVA)* 🏃‍♂️\n\n` +
+        `*Missão:* ${activity.name}\n` +
+        `*Distância:* ${distanceKm}km\n` +
+        `*Pace Médio:* ${paceMins}:${paceSecs}/km\n` +
+        `*Status:* ${statusEmoji} ${auditResult.complianceStatus}\n\n` +
+        `*Parecer do Head Coach:*\n_${auditResult.feedback}_`;
 
-    await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), auditMsg);
+      await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), auditMsg);
+    } catch (error) {
+      console.error('❌ [Strava] Falha de comunicação com o Telegram (Notificação de Auditoria):', error);
+    }
 
     // Gatilho imediato do Digital Twin para Longões (>= 4.9km)
     if (distanceKm >= 4.9) {

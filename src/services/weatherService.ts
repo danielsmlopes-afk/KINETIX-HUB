@@ -102,7 +102,8 @@ export async function getTomorrowWeather(city: string = 'São Paulo'): Promise<s
     const dateStr = tomorrow.toISOString().split('T')[0];
     
     // Busca a previsão para as 06h de amanhã, ou a primeira que o OWM devolver do dia
-    const forecast = data.list.find((item: any) => item.dt_txt.includes(`${dateStr} 06:00:00`)) || data.list.find((item: any) => item.dt_txt.includes(dateStr));
+    type ForecastItem = { dt_txt: string; weather: Array<{ description: string }>; main: { temp: number } };
+    const forecast = data.list.find((item: ForecastItem) => item.dt_txt.includes(`${dateStr} 06:00:00`)) || data.list.find((item: ForecastItem) => item.dt_txt.includes(dateStr));
     if (forecast) {
       const desc = forecast.weather[0].description;
       const weatherStr = `${Math.round(forecast.main.temp)}°C, ${desc.charAt(0).toUpperCase() + desc.slice(1)}`;

@@ -343,7 +343,15 @@ export async function generatePlanPDF(athleteId: string): Promise<Buffer> {
 export async function generateCareerReportPDF(): Promise<Buffer> {
   const allRaces = await db.select().from(races).orderBy(races.date);
 
-  let prRecords: any[] = [];
+  let prRecords: Array<{
+    year: number;
+    distance_target: string;
+    durationMinutes: number;
+    distance: number;
+    weather?: string;
+    mapPolyline?: string;
+    mapImageBuffer?: Buffer | null;
+  }> = [];
   try {
     const prRecordsResult = await db.execute(sql`
       WITH ActivityPRs AS (
@@ -369,7 +377,7 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
       )
       SELECT * FROM RankedPRs WHERE rank = 1 ORDER BY year DESC, distance_target ASC;
     `);
-    prRecords = (prRecordsResult.rows || prRecordsResult) as any[];
+    prRecords = (prRecordsResult.rows || prRecordsResult) as typeof prRecords;
     for (const pr of prRecords) {
       if (pr.mapPolyline) pr.mapImageBuffer = await fetchMapStaticBuffer(pr.mapPolyline);
     }

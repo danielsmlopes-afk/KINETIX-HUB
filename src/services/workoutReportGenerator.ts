@@ -240,7 +240,7 @@ export const generateWorkoutReportHtml = (workouts: PlannedWorkout[]): string =>
     return getHtmlTemplate('Relatório Semanal', '<h1>Nenhum treino para a semana.</h1>');
   }
 
-  const stage = (workouts[0] as any).mesocycleStage || 1;
+  const stage = workouts[0].mesocycleStage || 1;
   const raceWorkout = workouts.find(w => w.name?.toLowerCase().includes('prova'));
   const isRaceWeek = !!raceWorkout;
   

@@ -99,7 +99,7 @@ Ao calcular treinos intervalados (Sessões de Tiros), aplique a física de estei
     "priority_level": "${priority}",
     "distance_km": ${distance},
     "startTime": "${dateStr}",
-    "address": "${(athlete as any).address || 'São Paulo, SP'}"
+    "address": "${(athlete as { address?: string }).address || 'São Paulo, SP'}"
   },
   "speed_matrix_kmh": {
     "regenerative": 10.3,
@@ -143,10 +143,20 @@ REQUISITO OBRIGATÓRIO DE SAÍDA E ESTRUTURAMENTO:
       const rawResponse = await askHeadCoach(userPrompt, undefined, systemPrompt);
       const cleanJsonString = rawResponse.replace(/```json\n?/gi, '').replace(/```\n?/g, '').trim();
       
-      const workouts = JSON.parse(cleanJsonString);
+      const workouts = JSON.parse(cleanJsonString) as Array<{
+        date: string;
+        name: string;
+        warmup?: string | null;
+        cooldown?: string | null;
+        restDetails?: string | null;
+        corrida?: string | null;
+        academia?: string | null;
+        bike?: string | null;
+        mesocycleStage?: number;
+      }>;
 
       if (Array.isArray(workouts) && workouts.length > 0) {
-        const inserts = workouts.map((w: any) => ({
+        const inserts = workouts.map(w => ({
           athleteId: athlete.id,
           date: new Date(w.date),
           activityType: w.warmup ? 'RUN_INTERVAL' : (w.bike && !w.corrida ? 'BIKE' : (w.academia && !w.corrida && !w.bike ? 'STRENGTH' : 'RUN')),

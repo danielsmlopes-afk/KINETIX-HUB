@@ -108,8 +108,8 @@ export interface MacrocycleGenerationRequest {
   targetDistanceKm: number;
   targetPaceInstruction: string;
   athleteName: string;
-  existingWorkouts?: any[];
-  bioimpedance?: any;
+  existingWorkouts?: Record<string, unknown>[];
+  bioimpedance?: Record<string, unknown>;
 }
 
 export interface MacrocycleWorkout {

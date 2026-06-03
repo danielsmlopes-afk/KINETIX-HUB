@@ -132,6 +132,7 @@ export class StravaService {
   }
 
   async scanAndLogEnduranceRun(): Promise<void> {
+    try {
     console.log('🤖[Digital Twin V12.2] Iniciando varredura de Endurance (Longão)...');
     const athlete = await athleteRepository.getPrimaryAthlete();
     if (!athlete) return;
@@ -189,13 +190,13 @@ export class StravaService {
     };
     const prompt = `Atue como fisiologista de endurance. Analise a performance do longão cruzando as métricas de BPM médio e Pace com o impacto latente da temperatura climática na véspera (sono/madrugada) informada no contexto. Gere um score de 5 a 10 e uma análise de 4 linhas sobre o desempenho e provável 'Cardiac Drift', considerando o planejado. Formato de saída JSON: {"score_performance": X, "analise_ia": "..."}`;
     const aiRawResponse = await askHeadCoach(prompt, context);
-    const aiResponse = JSON.parse(aiRawResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+    const aiResponse = JSON.parse(aiRawResponse.replace(/```json/g, '').replace(/```/g, '').trim()) as { score_performance: number; analise_ia: string };
 
     const performanceLog = {
         distancia_real: (longRun.distance / 1000).toFixed(2),
-        distancia_meta: (plannedWorkout.details as any)?.corrida,
+        distancia_meta: (plannedWorkout.details as { corrida?: string })?.corrida,
         pace_real: new Date(longRun.moving_time * 1000).toISOString().substr(14, 5),
-        pace_meta: (plannedWorkout.details as any)?.corrida?.match(/@\s*(\d{1,2}:\d{2})/)?.[1],
+        pace_meta: (plannedWorkout.details as { corrida?: string })?.corrida?.match(/@\s*(\d{1,2}:\d{2})/)?.[1],
         laps: longRun.laps,
         cardio: longRun.average_heartrate,
         clima: `Treino: ${weather} | Véspera: ${weatherVespera}`,
@@ -213,5 +214,8 @@ export class StravaService {
     await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), message);
     
     console.log(`✅[Digital Twin] Log de performance do longão salvo para o treino ${plannedWorkout.id}.`);
+    } catch (error) {
+      console.error('❌ [Digital Twin] Falha sistêmica ou de API durante a varredura do longão:', error);
+    }
   }
 }
