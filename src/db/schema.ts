@@ -161,3 +161,16 @@ export const strengthLogs = pgTable('strength_logs', {
   weightUsed: doublePrecision('weight_used'),
   notes: text('notes'),
 });
+
+export const monumentRecords = pgTable('monument_records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  athleteId: uuid('athlete_id').references(() => athletes.id),
+  year: integer('year').notNull(),
+  eventName: text('event_name').notNull(),
+  distance: text('distance').notNull(),
+  officialTime: text('official_time').notNull(),
+  pace: text('pace').notNull(),
+  weather: text('weather'),
+  polyline: text('polyline'),
+  isAllTimePr: boolean('is_all_time_pr').default(false),
+});

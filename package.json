@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.10.1",
+    "@mapbox/polyline": "^1.2.1",
     "@neondatabase/serverless": "^0.9.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.10",
@@ -31,6 +32,7 @@
     "zod": "^3.23.6"
   },
   "devDependencies": {
+    "@types/mapbox__polyline": "^1.0.5",
     "@types/node": "^20.12.7",
     "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.13.9",

@@ -1,109 +1,62 @@
 import { Context } from 'hono';
+import { env } from '@/config/env';
 import { toggleMonitor } from '@/services/uptimeService';
 import { acwrService } from '@/services/acwrService';
 import { dbMaintenanceService } from '@/services/dbMaintenanceService';
 import { weatherPacingService } from '@/services/weatherPacingService';
 import { morningRaceService } from '@/services/morningRaceService';
 import { briefingService } from '@/services/briefingService';
-import { env } from '@/config/env';
-import { athleteRepository } from '@/repositories/athleteRepository';
-import { generateLogbookPdf } from '@/services/pdf/logbookService';
-import { generateCareerHistoryPdf } from '@/services/pdf/careerHistoryService';
-import { cardioEfficiencyService } from '@/services/pdf/cardioEfficiencyService';
-import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
-import { telegramMessageService } from '@/services/telegramMessageService';
-import { StravaService } from '@/services/stravaService';
-import { db } from '@/db'; 
-import { plannedWorkouts, workoutSessions } from '@/db/schema';
-import { eq, and, sql, isNull, gte, lte, inArray } from 'drizzle-orm';
-import { coachService } from '@/services/coachService';
-import { askHeadCoachForRecalculation } from '@/services/headCoachService';
+import { webhookService } from '@/services/webhookService';
 
-type WorkoutDetails = {
-  corrida?: string;
-  academia?: string;
-  bike?: string;
-  [key: string]: unknown;
-};
+const isAuth = (c: Context) => c.req.header('x-cron-secret') === env.CRON_SECRET;
+const authError = (c: Context) => c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
 
 export const webhookController = {
   toggleUptime: async (c: Context) => {
-    // 1. Verificação de Segurança (A senha que configuramos)
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
-    }
-
+    if (!isAuth(c)) return authError(c);
     try {
-      // 2. Extração do payload (0 ou 1)
-      const body = await c.req.json().catch(() => ({}));
-      const status = body.status;
-
-      if (status !== 0 && status !== 1) {
-        return c.json({ data: { message: 'Ping de Uptime recebido sem alteração de status.' } }, 200);
-      }
-
-      // 3. Execução da ação
-      await toggleMonitor(status);
-      return c.json({ data: { message: `Comando enviado para status ${status}` } }, 200);
-
+      const { status } = await c.req.json().catch(() => ({}));
+      if (status === 0 || status === 1) await toggleMonitor(status);
+      return c.json({ data: { message: `Comando processado com status: ${status}` } }, 200);
     } catch (error) {
       return c.json({ error: 'Erro ao processar webhook', code: 'INTERNAL_ERROR' }, 500);
     }
   },
 
   handleWeatherPacing: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
-    }
-
+    if (!isAuth(c)) return authError(c);
     try {
       await weatherPacingService.checkUpcomingRaces();
-      return c.json({ data: { message: 'Weather-Pacing executado e enviado com sucesso.' } }, 200);
+      return c.json({ data: { message: 'OK' } }, 200);
     } catch (error) {
-      return c.json({ error: 'Erro ao executar verificação de clima para provas.', code: 'WEATHER_PACING_ERR' }, 500);
+      return c.json({ error: 'Erro de processamento', code: 'WEATHER_PACING_ERR' }, 500);
     }
   },
 
   handleAcwrAudit: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
-    }
-
+    if (!isAuth(c)) return authError(c);
     try {
       await acwrService.calculateWeeklyFatigue();
-      return c.json({ data: { message: 'Auditoria de Fadiga Semanal (ACWR) concluída.' } }, 200);
+      return c.json({ data: { message: 'OK' } }, 200);
     } catch (error) {
-      return c.json({ error: 'Erro ao calcular auditoria ACWR.', code: 'ACWR_AUDIT_ERR' }, 500);
+      return c.json({ error: 'Erro interno', code: 'ACWR_AUDIT_ERR' }, 500);
     }
   },
 
   handleDbMaintenance: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
-    }
-
+    if (!isAuth(c)) return authError(c);
     try {
       await dbMaintenanceService.runMaintenanceTasks();
-      return c.json({ data: { message: 'Manutenção do banco de dados concluída.' } }, 200);
+      return c.json({ data: { message: 'OK' } }, 200);
     } catch (error) {
-      return c.json({ error: 'Erro durante a manutenção do banco de dados.', code: 'DB_MAINTENANCE_ERR' }, 500);
+      return c.json({ error: 'Erro', code: 'DB_MAINTENANCE_ERR' }, 500);
     }
   },
 
   handleManualTrigger: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
-    }
-
+    if (!isAuth(c)) return authError(c);
     try {
-      const body = await c.req.json() as { jobId?: string };
-      const jobId = body.jobId;
-
+      const { jobId } = await c.req.json() as { jobId?: string };
       switch (jobId) {
         case 'MORNING_RACE':
           await morningRaceService.executeMorningRoutines();
@@ -114,253 +67,63 @@ export const webhookController = {
         default:
           return c.json({ error: 'JobId inválido ou não suportado.', code: 'BAD_REQUEST' }, 400);
       }
-      return c.json({ data: { message: `Gatilho ${jobId} disparado com sucesso.` } }, 200);
+      return c.json({ data: { message: `Gatilho ${jobId} executado.` } }, 200);
     } catch (error) {
-      return c.json({ error: 'Erro ao processar disparo manual.', code: 'MANUAL_TRIGGER_ERR' }, 500);
+      return c.json({ error: 'Falha', code: 'MANUAL_TRIGGER_ERR' }, 500);
     }
   },
 
   triggerWeeklyReport: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    // Fire and forget
-    (async () => {
-      try {
-        const athlete = await athleteRepository.getPrimaryAthlete();
-        const athleteId = athlete?.id || 'primary-athlete';
-        const chatId = Number(env.TELEGRAM_CHAT_ID);
-        
-        const logbookBuffer = await generateLogbookPdf('Ciclo Ativo');
-        if (logbookBuffer) {
-          await telegramMessageService.sendPdfReport(chatId, logbookBuffer, 'Diario_de_Viagem.pdf', '📄 *DIÁRIO DE VIAGEM (LOGBOOK)*\n\nComandante, a operação semanal foi encerrada. Segue em anexo a topografia de Carga Aguda vs Crônica e o balanço do seu Macrociclo.');
-        }
-
-        const careerBuffer = await generateCareerHistoryPdf(athleteId);
-        if (careerBuffer) {
-          await telegramMessageService.sendPdfReport(chatId, careerBuffer, 'Historico_Carreira.pdf', '🎖️ *HISTÓRICO DE COMBATE*\n\nSeu dossiê de carreira foi atualizado com sucesso.');
-        }
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerWeeklyReport:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processWeeklyReport().catch(e => console.error('[Webhook] WeeklyReport Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerMonthlyReport: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        const athlete = await athleteRepository.getPrimaryAthlete();
-        const athleteId = athlete?.id || 'primary-athlete';
-        const chatId = Number(env.TELEGRAM_CHAT_ID);
-        const cardioBuffer = await cardioEfficiencyService.generateCardioReportPdf(athleteId, 'Geral');
-        if (cardioBuffer) {
-          await telegramMessageService.sendPdfReport(chatId, cardioBuffer, 'RaioX_Cardio.pdf', '🫀 *RAIO-X CARDIOVASCULAR*\n\nAnálise de eficiência cardiorrespiratória do mês gerada com sucesso.');
-        }
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerMonthlyReport:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processMonthlyReport().catch(e => console.error('[Webhook] MonthlyReport Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerRaceBriefing: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        let raceId = 'SP-21K'; // Fallback
-        try {
-          const body = await c.req.json();
-          if (body && body.raceId) raceId = body.raceId;
-        } catch (e) {} // Continua silenciosamente se não houver JSON
-        
-        const chatId = Number(env.TELEGRAM_CHAT_ID);
-        const briefingBuffer = await generateRaceBriefingPdf(raceId);
-        if (briefingBuffer) {
-          await telegramMessageService.sendPdfReport(chatId, briefingBuffer, `RaceBriefing_${raceId}.pdf`, `🎯 *PRONTUÁRIO DE PROVA: ${raceId}*\n\nTabela Smart Pace e Fatores Climáticos na Largada calculados com êxito.`);
-        }
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerRaceBriefing:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    let raceId = 'SP-21K';
+    try { const body = await c.req.json(); if (body?.raceId) raceId = body.raceId; } catch {}
+    webhookService.processRaceBriefing(raceId).catch(e => console.error('[Webhook] RaceBriefing Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerDigitalTwin: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        const stravaService = new StravaService();
-        await stravaService.scanAndLogEnduranceRun();
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerDigitalTwin:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processDigitalTwin().catch(e => console.error('[Webhook] DigitalTwin Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerRouteRecalculation: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        console.log('[Webhook] Executando Route Recalculation e Auditoria Noturna...');
-        const athlete = await athleteRepository.getPrimaryAthlete();
-        if (!athlete) return;
-
-        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-        const today = new Date(`${todayStr}T00:00:00Z`);
-
-        // 1. Auditar e cravar MISSED em treinos planejados para hoje que não foram validados
-        const pendingToday = await db.select().from(plannedWorkouts).where(
-          and(eq(plannedWorkouts.athleteId, athlete.id), sql`DATE(${plannedWorkouts.date}) = ${todayStr}`, isNull(plannedWorkouts.complianceStatus))
-        );
-        
-        for (const workout of pendingToday) {
-          await coachService.updateComplianceStatus(workout.id, 'MISSED');
-        }
-
-        // 2. Identificar falhas críticas (MISSED ou PARTIAL com volume abaixo do limiar)
-        const failedWorkouts = await db.select().from(plannedWorkouts).where(
-          and(
-            eq(plannedWorkouts.athleteId, athlete.id),
-            sql`DATE(${plannedWorkouts.date}) = ${todayStr}`,
-            inArray(plannedWorkouts.complianceStatus, ['MISSED', 'PARTIAL'])
-          )
-        );
-
-        if (failedWorkouts.length === 0) {
-          console.log('[Webhook] Compliance 100% ou desvios toleráveis. Nenhum recálculo necessário.');
-          return;
-        }
-
-        const VOLUME_TOLERANCE_THRESHOLD = 0.8;
-        const criticalFailures: (typeof plannedWorkouts.$inferSelect)[] = [];
-
-        const executedSessions = await db.select().from(workoutSessions).where(
-          and(
-            eq(workoutSessions.athleteId, athlete.id),
-            sql`DATE(${workoutSessions.date}) = ${todayStr}`
-          )
-        );
-
-        for (const workout of failedWorkouts) {
-          if (workout.complianceStatus === 'MISSED') {
-            criticalFailures.push(workout);
-            continue;
-          }
-
-          if (workout.complianceStatus === 'PARTIAL') {
-            const executedSession = executedSessions[0];
-            if (!executedSession) continue;
-
-            let volumeExecutado = 0;
-            let volumePlanejado = 0;
-            const details = workout.details as WorkoutDetails;
-
-            if (workout.activityType === 'RUN' || workout.activityType === 'RUN_INTERVAL') {
-              volumeExecutado = executedSession.distance ? executedSession.distance / 1000 : 0;
-              const corridaStr = details?.corrida;
-              if (corridaStr) {
-                const distMatch = corridaStr.match(/([\d.,]+)\s*km/i);
-                if (distMatch) volumePlanejado = parseFloat(distMatch[1].replace(',', '.'));
-              }
-            }
-
-            if (volumePlanejado > 0 && (volumeExecutado / volumePlanejado) < VOLUME_TOLERANCE_THRESHOLD) {
-              criticalFailures.push(workout);
-            }
-          }
-        }
-
-        if (criticalFailures.length > 0) {
-          console.log(`[Webhook] ${criticalFailures.length} falha(s) crítica(s) detectada(s). Acionando Head Coach para recálculo...`);
-          
-          const tomorrow = new Date(today); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-          const nextWeek = new Date(tomorrow); nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
-
-          const upcoming = await db.select().from(plannedWorkouts).where(
-            and(eq(plannedWorkouts.athleteId, athlete.id), gte(plannedWorkouts.date, tomorrow), lte(plannedWorkouts.date, nextWeek))
-          );
-
-          const contextData = {
-            treinosPerdidos: criticalFailures.map(w => ({ id: w.id, type: w.activityType, title: w.title, details: w.details, status: w.complianceStatus })),
-            proximosTreinos: upcoming.map(w => ({ id: w.id, date: w.date.toISOString(), type: w.activityType, title: w.title }))
-          };
-
-          const aiResponse = await askHeadCoachForRecalculation("Falha operacional crítica hoje. Por favor, ajuste o restante da semana compensando volume perdido sem sobrecarregar.", contextData);
-
-          for (const update of aiResponse.updates) {
-            if (update.action === 'CANCEL') await db.delete(plannedWorkouts).where(eq(plannedWorkouts.id, update.id));
-            else if (update.action === 'RESCHEDULE' && update.newDate) await db.update(plannedWorkouts).set({ date: new Date(update.newDate) }).where(eq(plannedWorkouts.id, update.id));
-          }
-
-          const updatesMsg = aiResponse.updates.map(u => `\n- ${u.action === 'CANCEL' ? '❌' : '📅'} ${u.notes}`).join('');
-          const msg = `⚠️ *ROTA RECALCULADA (FALHA CRÍTICA)* ⚠️\n\nO Head Coach detectou falha crítica no cumprimento da missão de hoje e ajustou seu calendário.\n\n🧠 *Parecer da IA:*\n${aiResponse.advice}\n\n⚙️ *Ações Tomadas:*${updatesMsg || '\nNenhuma alteração estrutural.'}`;
-          await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), msg);
-        } else {
-          console.log('[Webhook] Desvios de compliance dentro da tolerância. Nenhum recálculo necessário.');
-        }
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerRouteRecalculation:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processRouteRecalculation().catch(e => console.error('[Webhook] Recalculation Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerCarbLoading: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        console.log('[Webhook] Disparando Alerta de Carb-Loading Estratégico');
-        const chatId = Number(env.TELEGRAM_CHAT_ID);
-        const msg = `🍝 *Alerta Nutricional: Saturação de Carboidratos*\n\nComandante, prepare-se para o Longão de amanhã!\n\n- Inicie a saturação de carboidratos agora mesmo.\n- Reforce a hidratação (mínimo de 500ml de água antes de dormir).\n- Separe os géis e cápsulas de sal no seu arsenal logístico.\n\nBom descanso e foco absoluto na missão!`;
-        await telegramMessageService.sendSimpleMessage(chatId, msg);
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerCarbLoading:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processCarbLoading().catch(e => console.error('[Webhook] CarbLoading Erro:', e));
     return c.text('OK', 200);
   },
 
   triggerJointCheckin: async (c: Context) => {
-    const secret = c.req.header('x-cron-secret');
-    if (secret !== env.CRON_SECRET) {
-      return c.text('Unauthorized', 401);
-    }
-
-    (async () => {
-      try {
-        console.log('[Webhook] Disparando Check-in Articular Diário');
-        const chatId = Number(env.TELEGRAM_CHAT_ID);
-        const msg = `🦾 *Check-in Articular Diário*\n\nComo está o chassi hoje, comandante? Há algum desconforto agudo nos joelhos, panturrilhas ou ombro?\n\nSe existir alguma restrição clínica, responda com o comando:\n\`/dor <nota de 1 a 10> <local da dor>\`\n\n_Exemplo:_ \`/dor 4 joelho direito\``;
-        await telegramMessageService.sendSimpleMessage(chatId, msg);
-      } catch (error) {
-        console.error('❌ [Webhook] Erro no triggerJointCheckin:', error);
-      }
-    })();
+    if (!isAuth(c)) return authError(c);
+    webhookService.processJointCheckin().catch(e => console.error('[Webhook] JointCheckin Erro:', e));
     return c.text('OK', 200);
+  },
+
+  handleSundaySync: async (c: Context) => {
+    if (!isAuth(c)) return authError(c);
+    try {
+      const { syncedCount } = await webhookService.processSundaySync();
+      return c.json({ data: { message: 'Sunday Sync executado com sucesso.', syncedRaces: syncedCount } }, 200);
+    } catch (error: any) {
+      return c.json({ error: 'Falha no webhook dominical', details: error.message }, 500);
+    }
   }
 };

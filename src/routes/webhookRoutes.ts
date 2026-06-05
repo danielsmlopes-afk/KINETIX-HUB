@@ -15,6 +15,7 @@ webhookRoutes.post('/digital-twin', webhookController.triggerDigitalTwin);
 webhookRoutes.post('/route-recalculation', webhookController.triggerRouteRecalculation);
 webhookRoutes.post('/carb-loading', webhookController.triggerCarbLoading);
 webhookRoutes.post('/joint-checkin', webhookController.triggerJointCheckin);
+webhookRoutes.post('/sunday-sync', webhookController.handleSundaySync);
 
 // Fallback de segurança: Impede que requisições GET ou erradas
 // "vazem" para o middleware do Firebase no api.ts
