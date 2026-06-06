@@ -1,13 +1,17 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, and } from 'drizzle-orm';
 import { generateStaticMapUrl } from '@/services/mapService';
 
 export const hallOfFameController = {
   async getRecords(c: Context) {
     try {
-      const records = await db.select().from(monumentRecords).orderBy(desc(monumentRecords.year));
+      const user = c.get('user');
+      const records = await db.select()
+        .from(monumentRecords)
+        .where(eq(monumentRecords.athleteId, user.uid))
+        .orderBy(desc(monumentRecords.year));
       return c.json({ data: records });
     } catch (error) {
       console.error('Erro ao buscar o Hall of Fame:', error);
@@ -15,15 +19,55 @@ export const hallOfFameController = {
     }
   },
 
+  async addRecord(c: Context) {
+    try {
+      const body = await c.req.json();
+      const user = c.get('user');
+
+      const { year, eventName, distance, officialTime, pace, weather, polyline, isAllTimePr } = body;
+
+      if (!year || !eventName || !distance || !officialTime || !pace) {
+        return c.json({ error: 'Parâmetros obrigatórios ausentes.' }, 400);
+      }
+
+      // Se a nova prova já entrar como Crown Jewel, rebaixa as outras da mesma distância
+      if (isAllTimePr === true) {
+        await db.update(monumentRecords)
+          .set({ isAllTimePr: false })
+          .where(and(eq(monumentRecords.athleteId, user.uid), eq(monumentRecords.distance, distance)));
+      }
+
+      const inserted = await db.insert(monumentRecords).values({
+        athleteId: user.uid,
+        year: Number(year),
+        eventName,
+        distance,
+        officialTime,
+        pace,
+        weather: weather || '--',
+        polyline: polyline || null,
+        isAllTimePr: isAllTimePr || false,
+      }).returning();
+
+      return c.json({ data: inserted[0], message: 'Prova épica registrada com sucesso!' }, 201);
+    } catch (error) {
+      console.error('Erro ao registrar no Hall of Fame:', error);
+      return c.json({ error: 'Falha ao registrar prova épica.' }, 500);
+    }
+  },
+
   async getDossier(c: Context) {
     try {
       const id = c.req.param('id');
+      const user = c.get('user');
       
       if (!id) {
         return c.json({ error: 'O parâmetro ID é obrigatório.' }, 400);
       }
 
-      const records = await db.select().from(monumentRecords).where(eq(monumentRecords.id, id));
+      const records = await db.select()
+        .from(monumentRecords)
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
       
       if (!records || records.length === 0) {
         return c.json({ error: 'Record not found' }, 404);
@@ -264,21 +308,33 @@ export const hallOfFameController = {
   async togglePr(c: Context) {
     try {
       const id = c.req.param('id');
+      const user = c.get('user');
       
       if (!id) {
         return c.json({ error: 'O parâmetro ID é obrigatório.' }, 400);
       }
 
-      const records = await db.select().from(monumentRecords).where(eq(monumentRecords.id, id));
+      const records = await db.select()
+        .from(monumentRecords)
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
+
       if (!records || records.length === 0) {
         return c.json({ error: 'Record not found' }, 404);
       }
 
       const current = records[0].isAllTimePr;
       const newValue = !current;
+
+      // Se está promovendo uma nova Crown Jewel, rebaixa outros recordes da mesma distância
+      if (newValue === true) {
+        await db.update(monumentRecords)
+          .set({ isAllTimePr: false })
+          .where(and(eq(monumentRecords.athleteId, user.uid), eq(monumentRecords.distance, records[0].distance)));
+      }
+
       await db.update(monumentRecords)
         .set({ isAllTimePr: newValue })
-        .where(eq(monumentRecords.id, id));
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
 
       return c.json({ success: true, newValue });
     } catch (error) {

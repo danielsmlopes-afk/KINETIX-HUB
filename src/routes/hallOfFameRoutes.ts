@@ -8,6 +8,7 @@ import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
 const hallOfFameRoutes = new Hono();
 
 hallOfFameRoutes.get('/', hallOfFameController.getRecords);
+hallOfFameRoutes.post('/', hallOfFameController.addRecord);
 hallOfFameRoutes.get('/:id/dossier', hallOfFameController.getDossier);
 hallOfFameRoutes.patch('/:id/toggle-pr', hallOfFameController.togglePr);
 

@@ -2,7 +2,7 @@ import { stravaRepository } from '../repositories/stravaRepository';
 import { env } from '../config/env';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { db } from '@/db';
-import { plannedWorkouts } from '@/db/schema';
+import { plannedWorkouts, monumentRecords } from '@/db/schema';
 import { getHistoricalWeather } from './weatherService';
 import { askHeadCoach } from './headCoachService';
 import { telegramMessageService } from './telegramMessageService';
@@ -217,5 +217,116 @@ export class StravaService {
     } catch (error) {
       console.error('❌ [Digital Twin] Falha sistêmica ou de API durante a varredura do longão:', error);
     }
+  }
+
+  async syncHistoricalRaces(): Promise<{ totalImportado: number, prsIdentificados: number }> {
+    console.log('🔄 [Hall of Fame] Iniciando Operação Arquivo Morto: Extração Histórica do Strava...');
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) throw new Error('Atleta primário não encontrado.');
+
+    // 1. Busca as últimas 200 atividades (Paginando para garantir escopo histórico)
+    const activities = await this.getAthleteActivities(athlete.id, 1, 200);
+    console.log(`📡 [Hall of Fame] ${activities.length} atividades recebidas. Aplicando filtro tático...`);
+
+    const extractedMonuments: any[] = [];
+    
+    for (const act of activities) {
+      if (act.type !== 'Run') continue;
+
+      let targetDist = '';
+      if (act.distance >= 9800 && act.distance <= 10500) targetDist = '10K';
+      else if (act.distance >= 20900 && act.distance <= 21500) targetDist = '21K';
+      else if (act.distance >= 41800 && act.distance <= 42500) targetDist = '42K';
+      
+      if (!targetDist) continue;
+
+      const dateObj = new Date(act.start_date_local || act.start_date);
+      const year = dateObj.getFullYear();
+      
+      // Formatação de Tempo Oficial e Pace
+      const movingTime = act.moving_time;
+      const timeH = Math.floor(movingTime / 3600);
+      const timeM = Math.floor((movingTime % 3600) / 60);
+      const timeS = Math.floor(movingTime % 60);
+      const officialTime = `${timeH > 0 ? timeH + ':' : ''}${timeM.toString().padStart(2, '0')}:${timeS.toString().padStart(2, '0')}`;
+      
+      const distanceKm = act.distance / 1000;
+      const paceDec = (movingTime / 60) / distanceKm;
+      const paceM = Math.floor(paceDec);
+      const paceS = Math.floor((paceDec - paceM) * 60);
+      const pace = `${paceM.toString().padStart(2, '0')}:${paceS.toString().padStart(2, '0')}`;
+
+      extractedMonuments.push({
+        athleteId: athlete.id,
+        year,
+        eventName: act.name,
+        distance: targetDist,
+        officialTime,
+        pace,
+        weather: '--', // Sem dados históricos detalhados fáceis no Strava grátis (fallback)
+        polyline: act.map?.summary_polyline || null,
+        isAllTimePr: false,
+        _rawTime: movingTime // Fator matemático para achar os PRs
+      });
+    }
+
+    // 2. Filtrar duplicatas já existentes no banco (Baseado na assinatura Nome + Ano)
+    const existingRecords = await db.select().from(monumentRecords).where(eq(monumentRecords.athleteId, athlete.id));
+    const existingSignatures = new Set(existingRecords.map(r => `${r.eventName}-${r.year}`));
+
+    const toInsert = extractedMonuments.filter(m => !existingSignatures.has(`${m.eventName}-${m.year}`));
+    
+    if (toInsert.length === 0) {
+      console.log('✅ [Hall of Fame] Nenhuma nova prova qualificada para importação.');
+      return { totalImportado: 0, prsIdentificados: 0 };
+    }
+
+    // 3. Processamento e Avaliação de PRs (Crown Jewels) entre a base e o lote
+    let prsIdentificados = 0;
+    const parseTimeToSecs = (timeStr: string) => {
+      const p = timeStr.split(':').map(Number);
+      return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
+    };
+
+    for (const dist of ['10K', '21K', '42K']) {
+      const novosDaDistancia = toInsert.filter(m => m.distance === dist);
+      if (novosDaDistancia.length === 0) continue;
+
+      // Acha o melhor tempo entre os recém-importados
+      let bestNovo = novosDaDistancia[0];
+      for (const m of novosDaDistancia) {
+        if (m._rawTime < bestNovo._rawTime) bestNovo = m;
+      }
+
+      // Compara com o PR atualmente salvo no banco para a mesma distância
+      const existingPr = existingRecords.find(e => e.distance === dist && e.isAllTimePr);
+      let isGlobalPr = true;
+      
+      if (existingPr) {
+        const existingTime = parseTimeToSecs(existingPr.officialTime);
+        if (bestNovo._rawTime >= existingTime) {
+          isGlobalPr = false;
+        } else {
+          // Golpe de Estado: A nova corrida é melhor. Rebaixa a atual coroa do banco.
+          await db.update(monumentRecords).set({ isAllTimePr: false }).where(eq(monumentRecords.id, existingPr.id));
+        }
+      }
+
+      if (isGlobalPr) {
+        bestNovo.isAllTimePr = true;
+        prsIdentificados++;
+      }
+    }
+
+    // 4. Inserção Limpa no Banco (Removendo a propriedade temporária _rawTime)
+    const finalInserts = toInsert.map(m => {
+      const { _rawTime, ...rest } = m;
+      return rest;
+    });
+
+    await db.insert(monumentRecords).values(finalInserts);
+
+    console.log(`🏆 [Hall of Fame] Importação concluída! ${finalInserts.length} novas provas. PRs promovidos: ${prsIdentificados}`);
+    return { totalImportado: finalInserts.length, prsIdentificados };
   }
 }

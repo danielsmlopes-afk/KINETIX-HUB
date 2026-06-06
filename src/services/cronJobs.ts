@@ -46,6 +46,12 @@ export const runDigitalTwinJob = async () => {
 export const startCronJobs = () => initCronJobs();
 
 export const initCronJobs = () => {
+  // 🛡️ Environment Guard: Evita duplicidade se os crons forem engatilhados por Webhook externo
+  if (process.env.DISABLE_INTERNAL_CRONS === 'true') {
+    console.log('🛡️ [Kinetix] Internal Crons disabled (Delegated to external Webhooks).');
+    return;
+  }
+
   console.log('⏳ Inicializando Relógio Mestre Biológico do KINETIX HUB...');
 
   // 07:00 - Morning Race Job
