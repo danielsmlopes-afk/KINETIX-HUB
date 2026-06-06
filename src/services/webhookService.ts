@@ -7,9 +7,9 @@ import { telegramMessageService } from '@/services/telegramMessageService';
 import { StravaService } from '@/services/stravaService';
 import { db } from '@/db'; 
 import { plannedWorkouts, workoutSessions, races, monumentRecords, cronLogs } from '@/db/schema';
-import { eq, and, sql, isNull, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, sql, isNull, gte, lte, inArray, desc } from 'drizzle-orm';
 import { coachService } from '@/services/coachService';
-import { askHeadCoachForRecalculation } from '@/services/headCoachService';
+import { askHeadCoach, askHeadCoachForRecalculation } from '@/services/headCoachService';
 import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
 import { env } from '@/config/env';
 

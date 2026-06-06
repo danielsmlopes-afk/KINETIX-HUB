@@ -15,6 +15,7 @@ import { webhookRoutes } from '@/routes/webhookRoutes';
 import { debugRoutes } from '@/routes/debugRoutes';
 import { dossierRoutes } from '@/routes/dossierRoutes';
 import { workoutRoutes } from '@/routes/workoutRoutes';
+import hallOfFameRoutes from '@/routes/hallOfFameRoutes';
 
 export const apiRoutes = new Hono();
 
@@ -41,6 +42,7 @@ privateAppRoutes.route('/coach', coachRoutes);
 privateAppRoutes.route('/gear', gearRoutes);
 privateAppRoutes.route('/dossiers', dossierRoutes);
 privateAppRoutes.route('/workouts', workoutRoutes);
+privateAppRoutes.route('/hall-of-fame', hallOfFameRoutes);
 
 // Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);
