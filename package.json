@@ -15,7 +15,8 @@
     "db:migrate-tokens": "tsx src/db/migrateTokens.ts",
     "db:setup": "npm run db:reset && npm run db:push && npm run db:seed && npm run db:migrate-tokens",
     "db:import-races": "tsx src/services/importPastRaces.ts",
-    "seed:workouts": "tsx src/scripts/seedWorkouts.ts"
+    "seed:workouts": "tsx src/scripts/seedWorkouts.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@hono/node-server": "^1.10.1",
