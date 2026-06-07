@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
 import { desc, eq, and } from 'drizzle-orm';
-import { generateStaticMapUrl } from '@/services/mapService';
+import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
 
 export const hallOfFameController = {
   async getRecords(c: Context) {
@@ -16,6 +16,20 @@ export const hallOfFameController = {
     } catch (error) {
       console.error('Erro ao buscar o Hall of Fame:', error);
       return c.json({ error: 'Falha ao buscar os registros do Hall of Fame.' }, 500);
+    }
+  },
+
+  async getYearPrs(c: Context) {
+    try {
+      const user = c.get('user');
+      const records = await db.select()
+        .from(monumentRecords)
+        .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.isYearPr, true)))
+        .orderBy(desc(monumentRecords.year));
+      return c.json({ data: records });
+    } catch (error) {
+      console.error('Erro ao buscar os PRs do Ano:', error);
+      return c.json({ error: 'Falha ao buscar os registros de PRs anuais.' }, 500);
     }
   },
 
@@ -74,7 +88,14 @@ export const hallOfFameController = {
       }
       
       const record = records[0];
-      const mapUrl = generateStaticMapUrl(record.polyline || '');
+
+      let base64Map = '';
+      if (record.polyline) {
+        const mapBuffer = await fetchMapStaticBuffer(record.polyline);
+        if (mapBuffer) {
+          base64Map = 'data:image/png;base64,' + Buffer.from(mapBuffer).toString('base64');
+        }
+      }
       
       const html = `
 <!DOCTYPE html>
@@ -285,11 +306,11 @@ export const hallOfFameController = {
     
     <div class="map-section">
       <div class="map-title">CARTOGRAPHIC TELEMETRY</div>
-      ${mapUrl ? `
+      ${base64Map ? `
       <div class="map-container">
-        <img src="${mapUrl}" alt="Tactical Route Map" />
+        <img src="${base64Map}" alt="Tactical Route Map" />
       </div>` : `
-      <div class="no-map">No polyline telemetry available for this operation.</div>`}
+      <div class="no-map">[ MAPA DE TELEMETRIA INDISPONÍVEL ]</div>`}
     </div>
 
     <div class="footer">

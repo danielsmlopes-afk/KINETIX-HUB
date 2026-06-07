@@ -86,3 +86,16 @@ Ponto de comunicação direta com a UI Orientada a Tarefas (Task-Based UI) e o C
 
 ### Sumário de Responsabilidades de Segurança
 As Controllers dependem do `authMiddleware.ts` antes da execução lógica de negócio, assegurando que o ID Atleta (`athleteId`) só seja extraído após a decodificação real do JWT Firebase ou do Fallback Híbrido por Query String (para o ecossistema de relatórios nativos).
+
+---
+
+## 5. 🏆 MÓDULO HALL OF FAME (`hallOfFameController.ts`)
+
+Gerencia a celebração e a extração do Histórico de Monumentos.
+
+### Orquestração e Validação de Demotion
+- **`getRecords` / `getYearPrs`:** Acesso limpo via Drizzle ORM à tabela `monumentRecords`, provendo ordenação descendente consolidada para o UI.
+- **`addRecord` / `togglePr`:** Implementam ativamente a regra de auto-rebaixamento (*Demotion Rule*). Sempre que uma prova é chancelada como Crown Jewel (`isAllTimePr: true`), todas as demais provas da mesma quilometragem são rebaixadas (`isAllTimePr: false`) automaticamente via query restritiva.
+
+### Geração de Server-Driven UI (HTML Dossier)
+- **`getDossier`:** Retorna uma visualização HTML5 + CSS3 (Arquitetura SSR simplificada), gerando um "Tactical Dossier" formatado para a *InAppBrowserView* do mobile. Esta abordagem blinda a requisição e viabiliza estilos ricos como Glassmorphism sem sobrecarregar o motor nativo PDFKit.

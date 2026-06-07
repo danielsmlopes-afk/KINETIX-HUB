@@ -21,3 +21,6 @@ Os endpoints que emitem binários em Buffer (PDFs) extraídos destas tabelas ace
 
 ## Junção Analítica de Telemetria (Cardio Efficiency)
 O motor de PDF (`cardioEfficiencyService.ts`) efetua um `innerJoin` rigoroso entre `workout_sessions` e `planned_workouts` interceptando a âncora relacional `athleteId` e o mapeamento temporal (função estrita `DATE()`). Isso assegura que as métricas injetadas no Gráfico de Dispersão (Pace vs. Frequência Cardíaca Média) representem exclusivamente missões chanceladas de corrida ao ar livre ou esteira (RUN).
+
+## Regra de Auto-Rebaixamento (Demotion na monumentRecords)
+A tabela `monumentRecords` foi projetada com a premissa de flags de coroa excludentes. Operações que alteram a hierarquia de `isAllTimePr` ou `isYearPr` acionam atualizações de contingência: ao estabelecer um novo PR de 10K na história, o Banco de Dados destitui agressivamente os 10K anteriores, assegurando estabilidade na *Single Source of Truth* sem depender de triggers de sistema acoplados.

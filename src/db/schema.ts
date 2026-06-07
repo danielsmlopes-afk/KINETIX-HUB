@@ -193,4 +193,5 @@ export const monumentRecords = pgTable('monument_records', {
   weather: text('weather'),
   polyline: text('polyline'),
   isAllTimePr: boolean('is_all_time_pr').default(false),
+  isYearPr: boolean('is_year_pr').default(false),
 });

@@ -127,6 +127,7 @@ kinetix_app/
 │       ├── dashboard/   # Hub Central (Hoje, Amanhã, Bioimpedância)
 │       │   ├── bioimpedance_progress_screen.dart # Tela de histórico de evolução clínica e gráficos
 │       │   └── widgets/ # Componentização SOLID (UpcomingWorkoutsCard com ExpansionTile híbrido para Aquecimento/Desaquecimento).
+│       │   ├── hall_of_fame_screen.dart # Painel interativo de Crown Jewels e Histórico de Monumentos
 │       ├── dossiers/    # Relatórios em PDF
 │       │   ├── reports_screen.dart   # Painel executivo que exibe a lista de relatórios.
 │       │   └── pdf_viewer_screen.dart # Renderizador nativo de PDF embutido (SfPdfViewer).
@@ -152,6 +153,7 @@ kinetix_app/
 * **`[schema.ts]`** (`kinetix-api/src/db/schema.ts`): A espinha dorsal dos dados. Onde todas as tabelas em PostgreSQL são definidas.
 * **`[telegramController.ts]`** (`kinetix-api/src/controllers/telegramController.ts`): Orquestra as tendências de bioimpedância calculando deltas semanais e interagindo com a IA para emitir Alertas Vermelhos de nutrição.
 * **`[debugRoutes.ts]`** (`kinetix-api/src/routes/debugRoutes.ts`): Endpoints de injeção manual permitindo que o Comandante dispare varreduras temporais no frontend fora da janela agendada.
+* **`[MonumentAuditService.ts]`** (`kinetix-api/src/services/MonumentAuditService.ts`): Orquestrador de varredura que cruza resultados da base `races` para identificar PRs e qualificar provas oficiais na tabela `monumentRecords`.
 * **`[api_client.dart]`** (`kinetix_app/lib/core/network/api_client.dart`): Wrapper de rede que lida com os tokens de autenticação (Firebase) e se comunica com o Hono.
 * **`[dashboard_screen.dart]`** (`kinetix_app/lib/features/dashboard/dashboard_screen.dart`): UI principal que congrega o consumo de APIs fisiológicas, metas e exibe os selos de compliance do dia. Atua como hub de navegação injetando a rota para `bioimpedance_progress_screen.dart` via AppBar e interações de toque nativas no Card de telemetria.
 * **`[upcoming_races_card.dart]` / `[upcoming_workouts_card.dart]`**: Componentes Flutter operando de forma isolada. O `UpcomingWorkoutsCard` utiliza o `ExpansionTile` para *Glanceability* da Série Principal no estado colapsado, ocultando detalhes periféricos (Aquecimento, Desaquecimento, Repouso) sob demanda na expansão.
@@ -210,7 +212,11 @@ Estrutura consolidada do nosso PostgreSQL Serverless (Neon):
 * **`consumables`**: `currentStock` e `alertThreshold` de Géis e Sais.
 * **`exercise_library`** e **`workout_templates`**: Modelos pré-fabricados de musculação, relacionados N:N via **`workout_template_items`**.
 
-### 7. Tabelas de Filas Táticas
+### 7. monumentRecords (Hall of Fame)
+* **Função:** Repositório vitalício de marcas de combate do atleta (Crown Jewels e PRs do ano).
+* **Colunas Principais:** `distance`, `officialTime`, `pace`, `isAllTimePr` (Crown Jewel), `isYearPr` (Recorde Anual). Relacionado por `athleteId`.
+
+### 8. Tabelas de Filas Táticas
 
 * **`cron_logs`**: Guarda o resultado de execuções de rotinas (Briefing).
 * **`pending_actions`**: Eventos não processados exigindo tomada de decisão do usuário ou Head Coach.

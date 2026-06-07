@@ -19,3 +19,6 @@ Os motores de geração de dossiês (`pdfGeneratorService.ts`) executam o servi�
 
 ## Motor Analítico de Dispersão (Cardio Efficiency)
 O serviço `cardioEfficiencyService.ts` foi promovido para "Operação Fogo Real". Ele abandonou os stubs de dados estáticos e agora orquestra a extração e transformação puramente matemática dos registros reais em banco (`workoutSessions.durationMinutes`, `distance`, `averageHeartRate`), traduzindo variáveis fisiológicas complexas diretamente para o plano cartesiano bidimensional (`pdfkit`).
+
+## Auditoria de Monumentos (Monument Audit)
+O serviço `MonumentAuditService.ts` atua como o árbitro homologador do Hall of Fame. Ele varre a tabela `races` procurando operações completadas dentro das tolerâncias estritas de distância (10K, 15K, 21K, 42K) e promove estes registros para a tabela `monumentRecords`. Ele isola a telemetria, limpa o pace (focado na distância de chancela, não no ruído do GPS) e automaticamente rebaixa registros defasados caso a nova prova represente um Recorde Absoluto (`isAllTimePr`) ou do Ano (`isYearPr`).
