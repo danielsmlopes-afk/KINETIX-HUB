@@ -1,7 +1,25 @@
-import { pgTable, uuid, text, integer, timestamp, doublePrecision, boolean, jsonb, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, doublePrecision, boolean, jsonb, unique, customType } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+
+// Validador centralizado de UUID para blindar o banco e evitar crash (NeonDbError)
+const isUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+
+export const safeUuid = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return 'uuid';
+  },
+  toDriver(val: string) {
+    if (!isUUID(val)) {
+      const err = new Error(`Drizzle ORM interceptou um UUID mal formatado antes da query: "${val}"`);
+      err.name = 'DrizzleValidationError';
+      throw err;
+    }
+    return val;
+  },
+});
 
 export const athletes = pgTable('athletes', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   name: text('name').notNull(),
   stravaAccessToken: text('strava_access_token'),
   stravaRefreshToken: text('strava_refresh_token'),
@@ -12,7 +30,7 @@ export const athletes = pgTable('athletes', {
 });
 
 export const consumables = pgTable('consumables', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   type: text('type').notNull(), // 'gel' ou 'salt'
   name: text('name').notNull(),
   currentStock: integer('current_stock').notNull().default(0),
@@ -20,27 +38,27 @@ export const consumables = pgTable('consumables', {
 });
 
 export const exercises = pgTable('exercises', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   name: text('name').notNull(),
   type: text('type').notNull(),
 });
 
 export const shoes = pgTable('shoes', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   stravaGearId: text('strava_gear_id').notNull(),
   name: text('name').notNull(),
   mileage: doublePrecision('mileage').notNull().default(0),
 });
 
 export const exerciseLibrary = pgTable('exercise_library', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   name: text('name').notNull(),
   muscleGroup: text('muscle_group').notNull(),
   equipmentType: text('equipment_type'),
 });
 
 export const workoutTemplates = pgTable('workout_templates', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   name: text('name').notNull().unique(),
   description: text('description'),
   warmup: text('warmup'),
@@ -48,16 +66,16 @@ export const workoutTemplates = pgTable('workout_templates', {
 });
 
 export const workoutTemplateItems = pgTable('workout_template_items', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  templateId: uuid('template_id').notNull().references(() => workoutTemplates.id, { onDelete: 'cascade' }),
-  exerciseId: uuid('exercise_id').notNull().references(() => exerciseLibrary.id, { onDelete: 'restrict' }),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  templateId: safeUuid('template_id').notNull().references(() => workoutTemplates.id, { onDelete: 'cascade' }),
+  exerciseId: safeUuid('exercise_id').notNull().references(() => exerciseLibrary.id, { onDelete: 'restrict' }),
   sets: integer('sets').notNull(),
   reps: text('reps').notNull(),
   notes: text('notes'),
 });
 
 export const races = pgTable('races', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   category: text('category').notNull(),
   date: timestamp('date').notNull(),
   distance: doublePrecision('distance').notNull(),
@@ -74,11 +92,13 @@ export const races = pgTable('races', {
   isTarget: boolean('is_target').default(false),
   targetPace: text('target_pace'),
   priority: text('priority'),
+  // Métrica Cartográfica
+  elevationGain: integer('elevation_gain'),
 });
 
 export const workoutSessions = pgTable('workout_sessions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  athleteId: uuid('athlete_id').references(() => athletes.id),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id),
   date: timestamp('date').notNull(),
   durationMinutes: integer('duration_minutes').notNull(),
   load: doublePrecision('load'),
@@ -92,15 +112,15 @@ export const workoutSessions = pgTable('workout_sessions', {
 });
 
 export const treadmillIntervals = pgTable('treadmill_intervals', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  sessionId: uuid('session_id').references(() => workoutSessions.id),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  sessionId: safeUuid('session_id').references(() => workoutSessions.id),
   distanceMeters: doublePrecision('distance_meters').notNull(),
   speedKmh: doublePrecision('speed_kmh').notNull(),
 });
 
 export const bioimpedanceLogs = pgTable('bioimpedance_logs', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  athleteId: uuid('athlete_id').references(() => athletes.id),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id),
   date: timestamp('date').notNull(),
   weight: doublePrecision('weight').notNull(),
   bodyFat: doublePrecision('body_fat').notNull(),
@@ -117,8 +137,8 @@ export const bioimpedanceLogs = pgTable('bioimpedance_logs', {
 }));
 
 export const plannedWorkouts = pgTable('planned_workouts', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  athleteId: uuid('athlete_id').references(() => athletes.id).notNull(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id).notNull(),
   date: timestamp('date').notNull(),
   activityType: text('activity_type').notNull(),
   title: text('title').notNull(),
@@ -135,7 +155,7 @@ export const plannedWorkouts = pgTable('planned_workouts', {
 });
 
 export const cronLogs = pgTable('cron_logs', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   jobName: text('job_name').notNull(),
   runAt: timestamp('run_at').defaultNow().notNull(),
   status: text('status').notNull(),
@@ -143,9 +163,9 @@ export const cronLogs = pgTable('cron_logs', {
 });
 
 export const pendingActions = pgTable('pending_actions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  athleteId: uuid('athlete_id').references(() => athletes.id).notNull(),
-  workoutId: uuid('workout_id').notNull(),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id).notNull(),
+  workoutId: safeUuid('workout_id').notNull(),
   action: text('action').notNull(), // 'RESCHEDULE' | 'CANCEL'
   newDate: timestamp('new_date'),
   notes: text('notes'),
@@ -153,9 +173,9 @@ export const pendingActions = pgTable('pending_actions', {
 });
 
 export const strengthLogs = pgTable('strength_logs', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  sessionId: uuid('session_id').notNull().references(() => workoutSessions.id, { onDelete: 'cascade' }),
-  exerciseId: uuid('exercise_id').notNull().references(() => exerciseLibrary.id, { onDelete: 'restrict' }),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  sessionId: safeUuid('session_id').notNull().references(() => workoutSessions.id, { onDelete: 'cascade' }),
+  exerciseId: safeUuid('exercise_id').notNull().references(() => exerciseLibrary.id, { onDelete: 'restrict' }),
   actualSets: integer('actual_sets').notNull(),
   actualReps: text('actual_reps').notNull(),
   weightUsed: doublePrecision('weight_used'),
@@ -163,8 +183,8 @@ export const strengthLogs = pgTable('strength_logs', {
 });
 
 export const monumentRecords = pgTable('monument_records', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  athleteId: uuid('athlete_id').references(() => athletes.id),
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id),
   year: integer('year').notNull(),
   eventName: text('event_name').notNull(),
   distance: text('distance').notNull(),

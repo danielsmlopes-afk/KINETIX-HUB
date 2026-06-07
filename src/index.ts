@@ -11,6 +11,18 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', cors());
 
+// Tratador Global de Erros para interceptar UUIDs inválidos e evitar crash
+app.onError((err, c) => {
+  if (err.name === 'DrizzleValidationError') {
+    return c.json({
+      error: 'Formato de identificador (UUID) inválido na requisição.',
+      details: err.message
+    }, 400);
+  }
+  console.error('💥 Erro não tratado:', err);
+  return c.json({ error: 'Erro Interno do Servidor', code: 'INTERNAL_ERROR' }, 500);
+});
+
 // Rota raiz para evitar erro 404 (Render/Pings)
 app.get('/', (c) => {
   return c.text('KINETIX HUB API IS RUNNING', 200);

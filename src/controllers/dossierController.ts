@@ -3,12 +3,20 @@ import { db } from '@/db';
 import { races, workoutSessions } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { athleteRepository } from '@/repositories/athleteRepository';
+import { redisClient } from '@/config/redis';
 
 export const dossierController = {
   async getDossier(c: Context) {
     try {
       const athlete = await athleteRepository.getPrimaryAthlete();
       if (!athlete) return c.json({ error: 'Atleta não encontrado', code: 'NOT_FOUND' }, 404);
+
+      // Cache de 1 hora para o Dossiê, já que o loop sobre todo o histórico fica muito pesado com o tempo
+      const cacheKey = `dossier:prs:${athlete.id}`;
+      if (redisClient) {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) return c.json({ data: JSON.parse(cached) }, 200);
+      }
 
       const allRaces = await db.select().from(races).orderBy(desc(races.date));
       
@@ -36,7 +44,10 @@ export const dossierController = {
         }
       }
 
-      return c.json({ data: { races: allRaces, personalRecords: { '10k': best10k, '21k': best21k, '42k': best42k } } }, 200);
+      const responseData = { races: allRaces, personalRecords: { '10k': best10k, '21k': best21k, '42k': best42k } };
+      if (redisClient) await redisClient.set(cacheKey, JSON.stringify(responseData), 'EX', 60 * 60); // 1 hora
+
+      return c.json({ data: responseData }, 200);
     } catch (error) {
       console.error('❌ Erro no Dossiê:', error);
       return c.json({ error: 'Erro interno ao gerar dossiê.', code: 'INTERNAL_ERROR' }, 500);

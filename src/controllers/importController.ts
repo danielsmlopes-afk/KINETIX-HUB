@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { plannedWorkouts } from '@/db/schema';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { workoutBatchSchema, WorkoutPayload } from '@/validators/workoutSchema';
+import { redisClient } from '@/config/redis';
 
 export const importController = {
   async importPlan(c: Context) {
@@ -55,6 +56,9 @@ export const importController = {
       }));
 
       const inserted = await db.insert(plannedWorkouts).values(valuesToInsert).returning();
+
+      // Invalida o cache do Dashboard após importar a nova planilha
+      if (redisClient) await redisClient.del(`dashboard:profile:${athlete.id}`);
 
       return c.json({ data: { message: "Planilha importada com sucesso", count: inserted.length } }, 201);
     } catch (error) {

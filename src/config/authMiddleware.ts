@@ -1,5 +1,11 @@
 import { Context, Next } from 'hono';
 import { firebaseAdmin } from '@/config/firebase';
+import { athleteRepository } from '@/repositories/athleteRepository';
+import { redisClient } from '@/config/redis';
+
+// Fallback em memória caso o Redis não esteja disponível na env
+let localAthleteId: string | null = null;
+let localCacheExpiration = 0;
 
 export const firebaseAuthMiddleware = async (c: Context, next: Next) => {
   const authHeader = c.req.header('Authorization');
@@ -23,7 +29,35 @@ export const firebaseAuthMiddleware = async (c: Context, next: Next) => {
 
   try {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
-    c.set('user', decodedToken); // Injeta os dados validados do usuário no contexto
+    
+    // Otimização: Cache Distribuído no Redis (TTL de 15 min) para o ID Single-Tenant
+    let athleteId: string | null = null;
+    
+    if (redisClient) {
+      athleteId = await redisClient.get('primary_athlete_id');
+    } else {
+      const now = Date.now();
+      if (localAthleteId && now <= localCacheExpiration) athleteId = localAthleteId;
+    }
+
+    if (!athleteId) {
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      if (athlete) {
+        athleteId = athlete.id;
+        if (redisClient) {
+          await redisClient.set('primary_athlete_id', athleteId, 'EX', 15 * 60);
+        } else {
+          localAthleteId = athleteId;
+          localCacheExpiration = Date.now() + 15 * 60 * 1000;
+        }
+      }
+    }
+    
+    // Injeta os dados validados do usuário no contexto, garantindo que 'user.id'
+    // contenha um UUID válido e não a string do Firebase (user.uid).
+    // Isso previne o erro NeonDbError: invalid input syntax for type uuid
+    c.set('user', { ...decodedToken, id: athleteId });
+    
     await next();
   } catch (error) {
     console.error('❌ Erro na validação do Firebase Auth:', error instanceof Error ? error.message : error);

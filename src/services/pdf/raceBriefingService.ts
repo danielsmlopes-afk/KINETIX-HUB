@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { db } from '@/db';
 import { races } from '@/db/schema';
 import { eq, and, gte, asc, or } from 'drizzle-orm';
+import { briefingService } from '@/services/briefingService';
 
 export async function generateRaceBriefingPdf(raceId?: string): Promise<Buffer> {
   const today = new Date();
@@ -15,6 +16,14 @@ export async function generateRaceBriefingPdf(raceId?: string): Promise<Buffer> 
   ).orderBy(asc(races.date)).limit(1);
 
   const targetRace = upcomingRaces.length > 0 ? upcomingRaces[0] : null;
+
+  let weatherForecast = 'Condição Climática Desconhecida';
+  let elevationText = 'Altimetria N/D';
+
+  if (targetRace) {
+    weatherForecast = await briefingService.getWeatherPoP(targetRace.latitude, targetRace.longitude);
+    elevationText = targetRace.elevationGain ? `+${targetRace.elevationGain}m de Ganho de Elevação` : 'Altimetria N/D';
+  }
 
   return new Promise((resolve, reject) => {
     try {
@@ -35,6 +44,7 @@ export async function generateRaceBriefingPdf(raceId?: string): Promise<Buffer> 
 
       doc.fontSize(20).fillColor('#333333').text(`Race Briefing: Tabela Smart Pace`, { align: 'center' });
       doc.fontSize(12).fillColor('#666666').text(`Operação: ${raceName} | Data: ${raceDateStr} às ${targetRace.startTime} | Distância: ${targetRace.distance}km`, { align: 'center' });
+      doc.fontSize(12).fillColor('#666666').text(`Topografia da Missão: ${elevationText}`, { align: 'center' });
 
       const startX = 50, startY = 150, rowHeight = 30;
       const col1 = 60, col2 = 200, col3 = 350;
@@ -90,7 +100,7 @@ export async function generateRaceBriefingPdf(raceId?: string): Promise<Buffer> 
       }
 
       doc.moveDown(2).fontSize(14).font('Helvetica-Bold').text('Condições Climáticas Esperadas:');
-      doc.font('Helvetica').fontSize(12).text(targetRace.weather || 'Temperatura na Largada: 18°C | Umidade: 65%');
+      doc.font('Helvetica').fontSize(12).text(weatherForecast);
       doc.end();
     } catch (error) { reject(error); }
   });

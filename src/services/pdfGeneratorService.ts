@@ -4,23 +4,43 @@ import { eq, and, between, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { env } from '@/config/env';
 import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
+import { redisClient } from '@/config/redis';
 
-const mapBufferCache = new Map<string, Buffer>();
+// Fallback de cache local caso o Redis não esteja configurado
+const localMapCache = new Map<string, Buffer>();
 
 export async function fetchMapStaticBuffer(polyline: string): Promise<Buffer | null> {
   if (!env.MAPSTATIC_URL || !polyline) return null;
   
-  if (mapBufferCache.has(polyline)) return mapBufferCache.get(polyline)!;
+  const cacheKey = `map:polyline:${polyline}`;
+
+  // 1. Tenta buscar no cache distribuído (Redis) ou local
+  if (redisClient) {
+    try {
+      const cachedBuffer = await redisClient.getBuffer(cacheKey); // Usar getBuffer para binários!
+      if (cachedBuffer) return cachedBuffer;
+    } catch (err) {
+      console.error('❌ [Redis] Erro ao ler cache de mapa:', err);
+    }
+  } else if (localMapCache.has(polyline)) {
+    return localMapCache.get(polyline)!;
+  }
 
   try {
+    // 2. Se não estiver no cache, aciona o Motor MapStatic
     const url = new URL(env.MAPSTATIC_URL);
     url.searchParams.append('path', `weight:3|color:0xff0000ff|enc:${polyline}`);
     url.searchParams.append('size', '600x300');
     const response = await fetch(url.toString());
     if (!response.ok) return null;
+    
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    mapBufferCache.set(polyline, buffer);
+    
+    // 3. Salva a imagem processada no cache (TTL 30 Dias)
+    if (redisClient) await redisClient.set(cacheKey, buffer, 'EX', 60 * 60 * 24 * 30).catch(console.error);
+    else localMapCache.set(polyline, buffer);
+
     return buffer;
   } catch (error) {
     console.error('❌ [MapStatic] Erro de rede interna:', error);
@@ -186,6 +206,9 @@ export async function generateRaceReportPDF(raceId: string): Promise<Buffer> {
     doc.text(`Local da Largada: ${race.startLocation}`);
     if (race.weather) {
       doc.text(`Clima na Largada: ${race.weather}`);
+    }
+    if (race.elevationGain) {
+      doc.text(`Altimetria (Ganho de Elevação): +${race.elevationGain}m`);
     }
     doc.text(`Categoria: ${race.category}`);
     doc.text(`Tempo de Prova: ${timeStr}`);

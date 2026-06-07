@@ -10,7 +10,7 @@ export const hallOfFameController = {
       const user = c.get('user');
       const records = await db.select()
         .from(monumentRecords)
-        .where(eq(monumentRecords.athleteId, user.uid))
+        .where(eq(monumentRecords.athleteId, user.id))
         .orderBy(desc(monumentRecords.year));
       return c.json({ data: records });
     } catch (error) {
@@ -34,11 +34,11 @@ export const hallOfFameController = {
       if (isAllTimePr === true) {
         await db.update(monumentRecords)
           .set({ isAllTimePr: false })
-          .where(and(eq(monumentRecords.athleteId, user.uid), eq(monumentRecords.distance, distance)));
+          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.distance, distance)));
       }
 
       const inserted = await db.insert(monumentRecords).values({
-        athleteId: user.uid,
+        athleteId: user.id,
         year: Number(year),
         eventName,
         distance,
@@ -67,7 +67,7 @@ export const hallOfFameController = {
 
       const records = await db.select()
         .from(monumentRecords)
-        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.id)));
       
       if (!records || records.length === 0) {
         return c.json({ error: 'Record not found' }, 404);
@@ -316,7 +316,7 @@ export const hallOfFameController = {
 
       const records = await db.select()
         .from(monumentRecords)
-        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.id)));
 
       if (!records || records.length === 0) {
         return c.json({ error: 'Record not found' }, 404);
@@ -329,12 +329,12 @@ export const hallOfFameController = {
       if (newValue === true) {
         await db.update(monumentRecords)
           .set({ isAllTimePr: false })
-          .where(and(eq(monumentRecords.athleteId, user.uid), eq(monumentRecords.distance, records[0].distance)));
+          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.distance, records[0].distance)));
       }
 
       await db.update(monumentRecords)
         .set({ isAllTimePr: newValue })
-        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.uid)));
+        .where(and(eq(monumentRecords.id, id), eq(monumentRecords.athleteId, user.id)));
 
       return c.json({ success: true, newValue });
     } catch (error) {

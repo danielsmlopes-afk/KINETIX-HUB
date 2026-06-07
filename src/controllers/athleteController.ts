@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { athletes, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
 import { eq, desc, gte, lt, and, asc } from 'drizzle-orm';
 import { getTodayWeather, getTomorrowWeather } from '@/services/weatherService';
+import { redisClient } from '@/config/redis';
 
 export const athleteController = {
   async getProfile(c: Context) {
@@ -14,6 +15,15 @@ export const athleteController = {
         return c.json({ error: 'Atleta principal não encontrado no sistema.', code: 'NOT_FOUND' }, 404);
       }
       const athlete = athleteList[0];
+
+      // 1.5 Otimização com Redis: Cache do Dashboard (Previne sobrecarga de Banco e API de Clima)
+      const cacheKey = `dashboard:profile:${athlete.id}`;
+      if (redisClient) {
+        const cachedProfile = await redisClient.get(cacheKey);
+        if (cachedProfile) {
+          return c.json({ data: JSON.parse(cachedProfile) }, 200);
+        }
+      }
 
       // 2. Busca a Última Bioimpedância Registrada
       const bioList = await db.select()
@@ -140,6 +150,10 @@ export const athleteController = {
         todayWeather,
         tomorrowWeather
       };
+
+      // Salva no Redis com TTL de 5 minutos (300 segundos)
+      if (redisClient) await redisClient.set(cacheKey, JSON.stringify(profile), 'EX', 5 * 60);
+
       return c.json({ data: profile }, 200);
     } catch (error) {
       console.error('❌ Erro ao buscar perfil do atleta:', error);

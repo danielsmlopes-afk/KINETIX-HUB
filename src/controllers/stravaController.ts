@@ -8,6 +8,7 @@ import { plannedWorkouts } from '@/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { StravaService, StravaActivity } from '@/services/stravaService';
 import { telegramMessageService } from '@/services/telegramMessageService';
+import { redisClient } from '@/config/redis';
 
 type StravaWebhookPayload = {
   'hub.mode'?: string;
@@ -20,6 +21,11 @@ type StravaWebhookPayload = {
 };
 
 export const stravaController = {
+  async historicalSync(c: Context) {
+    // Rota dummy para evitar erro 404 no frontend mantendo a interface silenciosa
+    return c.json({ data: { message: 'Sincronização histórica já processada (Motor Passivo).' } }, 200);
+  },
+
   async handleWebhook(c: Context) {
     try {
       // 1. Verificação de Assinatura do Webhook (Requisição GET)
@@ -181,5 +187,8 @@ export const stravaController = {
       const stravaSvc = new StravaService();
       stravaSvc.scanAndLogEnduranceRun().catch(console.error);
     }
+
+    // Invalida o cache do Dashboard para refletir o novo treino sincronizado imediatamente
+    if (redisClient) await redisClient.del(`dashboard:profile:${athlete.id}`);
   }
 };
