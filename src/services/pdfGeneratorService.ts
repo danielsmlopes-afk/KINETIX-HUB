@@ -1,9 +1,9 @@
 // Arquivo: src/services/pdfGeneratorService.ts
 import PDFDocument from 'pdfkit';
-import { eq, and, between, inArray, sql } from 'drizzle-orm';
+import { eq, and, between, inArray, sql, desc } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { env } from '@/config/env';
-import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
+import { workoutSessions, treadmillIntervals, bioimpedanceLogs, races, plannedWorkouts, strengthLogs, exerciseLibrary, workoutTemplateItems } from '@/db/schema';
 import { redisClient } from '@/config/redis';
 
 // Fallback de cache local caso o Redis não esteja configurado
@@ -252,6 +252,18 @@ export async function generateLogbookPDF(athleteId: string, startDate: Date, end
   const cnvPct = totalEvaluated > 0 ? (completedNotValidated / totalEvaluated) * 100 : 0;
   const missedPct = totalEvaluated > 0 ? (missed / totalEvaluated) * 100 : 0;
 
+  // Busca o Longão da semana (Treino com maior distância) para gerar o mapa cartográfico
+  const sessions = await db.select().from(workoutSessions)
+    .where(and(eq(workoutSessions.athleteId, athleteId), between(workoutSessions.date, startDate, endDate)))
+    .orderBy(desc(workoutSessions.distance))
+    .limit(1);
+  
+  const longestRun = sessions[0];
+  let mapBuffer: Buffer | null = null;
+  if (longestRun && longestRun.mapPolyline) {
+    mapBuffer = await fetchMapStaticBuffer(longestRun.mapPolyline);
+  }
+
   return new Promise((resolve, reject) => {
     const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
     const doc = new Doc({ margin: 50 });
@@ -304,6 +316,21 @@ export async function generateLogbookPDF(athleteId: string, startDate: Date, end
         doc.moveDown(0.2);
       });
     }
+
+    // INJEÇÃO DA OPERAÇÃO DE ENDURANCE (LONGÃO E MAPA) NO RELATÓRIO
+    if (longestRun) {
+      doc.moveDown(2);
+      doc.fontSize(16).fillColor('black').text('Operação Principal (Longão da Semana)').moveDown(0.5);
+      doc.fontSize(10).fillColor('#4b5563').text(`Data: ${longestRun.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} | Distância Apurada: ${(longestRun.distance! / 1000).toFixed(2)} km`);
+      doc.text(`Duração Total: ${longestRun.durationMinutes} minutos`).moveDown(1);
+      
+      if (mapBuffer) {
+        doc.image(mapBuffer, { fit: [450, 250], align: 'center' });
+      } else {
+        doc.fillColor('red').fontSize(10).text('[ SOBERANIA CARTOGRÁFICA: MAPA INDISPONÍVEL ]', { align: 'center' }).fillColor('black');
+      }
+    }
+
     doc.end();
   });
 }
@@ -466,20 +493,104 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
   });
 }
 
-export async function generateStrengthAuditPDF(sessionId: string): Promise<Buffer> {
-  // TODO: Conectar lógica avançada de Cruzamento IronLog (Planejado vs Realizado)
-  // Retorna documento Base para suprimir erro 404/500 caso a rota seja chamada antecipadamente
+export async function generateStrengthAuditPDF(sessionId: string, templateId?: string): Promise<Buffer> {
+  // 1. Busca os dados da Sessão Base
+  const sessionResult = await db.select().from(workoutSessions).where(eq(workoutSessions.id, sessionId)).limit(1);
+  const session = sessionResult[0];
+
+  if (!session) {
+    throw new Error("Sessão de força não encontrada no banco de dados.");
+  }
+
+  // 2. Busca o detalhamento executado do IronLog (cargas, reps, series)
+  let logs: any[] = [];
+  
+  if (templateId) {
+    logs = await db.select({
+      exerciseName: exerciseLibrary.name,
+      actualSets: strengthLogs.actualSets,
+      actualReps: strengthLogs.actualReps,
+      weightUsed: strengthLogs.weightUsed,
+      plannedSets: workoutTemplateItems.sets,
+      plannedReps: workoutTemplateItems.reps,
+    })
+    .from(strengthLogs)
+    .leftJoin(exerciseLibrary, eq(strengthLogs.exerciseId, exerciseLibrary.id))
+    .leftJoin(workoutTemplateItems, and(
+      eq(workoutTemplateItems.exerciseId, exerciseLibrary.id),
+      eq(workoutTemplateItems.templateId, templateId)
+    ))
+    .where(eq(strengthLogs.sessionId, sessionId));
+  } else {
+    logs = await db.select({
+      exerciseName: exerciseLibrary.name,
+      actualSets: strengthLogs.actualSets,
+      actualReps: strengthLogs.actualReps,
+      weightUsed: strengthLogs.weightUsed,
+    })
+    .from(strengthLogs)
+    .leftJoin(exerciseLibrary, eq(strengthLogs.exerciseId, exerciseLibrary.id))
+    .where(eq(strengthLogs.sessionId, sessionId));
+  }
+
   return new Promise((resolve, reject) => {
     const Doc = typeof PDFDocument === 'function' ? PDFDocument : (PDFDocument as any).default || PDFDocument;
     const doc = new Doc({ margin: 50 });
     const buffers: Buffer[] = [];
+
     doc.on('data', (chunk: Buffer) => buffers.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
     doc.fontSize(20).fillColor('black').text('KINETIX HUB - Auditoria de Força (IronLog)', { align: 'center' }).moveDown(2);
-    doc.fontSize(12).text(`Sessão ID: ${sessionId}`);
-    doc.text('Relatório em construção. O Head Coach está calibrando a telemetria de cargas.');
+    
+    // Cabeçalho da Sessão
+    doc.fontSize(12).fillColor('#4b5563').text(`ID da Operação: ${sessionId}`);
+    doc.fillColor('black').text(`Data do Combate: ${session.date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+    doc.text(`Duração Total: ${session.durationMinutes ?? '--'} minutos`).moveDown(2);
+
+    doc.fontSize(16).text('Telemetria de Cargas e Repetições').moveDown(1);
+
+    if (logs.length === 0) {
+      doc.fontSize(12).fillColor('red').text('Alerta: Nenhum exercício ou registro de carga detectado para esta sessão.');
+    } else {
+      logs.forEach((log, idx) => {
+        const exerciseName = log.exerciseName || 'Exercício não identificado';
+        const sets = log.actualSets ?? '-';
+        const reps = log.actualReps || '-';
+        const weight = log.weightUsed ?? '-';
+        const plannedSets = log.plannedSets ?? '-';
+        const plannedReps = log.plannedReps ?? '-';
+
+        doc.fontSize(12).fillColor('black').font('Helvetica-Bold').text(`${idx + 1}. ${exerciseName}`);
+        
+        let setsColor = '#4b5563';
+        // Aciona o alerta vermelho se o Atleta "roubar" na série
+        if (typeof log.actualSets === 'number' && typeof log.plannedSets === 'number' && log.actualSets < log.plannedSets) {
+          setsColor = 'red';
+        }
+
+        let repsColor = '#4b5563';
+        const actualRepsNum = parseInt(String(log.actualReps), 10);
+        const plannedRepsNum = parseInt(String(log.plannedReps), 10);
+        // Aciona o alerta vermelho se o Atleta não atingir a meta de repetições
+        if (!isNaN(actualRepsNum) && !isNaN(plannedRepsNum) && actualRepsNum < plannedRepsNum) {
+          repsColor = 'red';
+        }
+
+        doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`    Séries: `, { continued: true });
+        doc.fillColor(setsColor).text(`${sets}`, { continued: true });
+        doc.fillColor('#4b5563').text(` / ${plannedSets} | Repetições: `, { continued: true });
+        doc.fillColor(repsColor).text(`${reps}`, { continued: true });
+        doc.fillColor('#4b5563').text(` / ${plannedReps} | Carga Efetiva: ${weight} kg`);
+        
+        doc.moveDown(0.5);
+      });
+    }
+
+    doc.moveDown(3);
+    doc.fontSize(10).fillColor('#9ca3af').text('Relatório gerado pelo motor Kinetix Hub.', { align: 'center' });
+
     doc.end();
   });
 }

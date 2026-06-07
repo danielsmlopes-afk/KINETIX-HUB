@@ -151,11 +151,12 @@ export const reportController = {
   async downloadStrengthAudit(c: Context) {
     try {
       const sessionId = c.req.param('sessionId');
+      const templateId = c.req.query('templateId');
 
       if (!sessionId) {
         return c.json({ error: "O parâmetro 'sessionId' é obrigatório.", code: "MISSING_PARAMS" }, 400);
       }
-      const pdfBuffer = await generateStrengthAuditPDF(sessionId);
+      const pdfBuffer = await generateStrengthAuditPDF(sessionId, templateId);
       c.header('Content-Type', 'application/pdf');
       c.header('Content-Disposition', `attachment; filename="auditoria_forca_${sessionId.slice(0,6)}.pdf"`);
       return c.body(new Uint8Array(pdfBuffer));
