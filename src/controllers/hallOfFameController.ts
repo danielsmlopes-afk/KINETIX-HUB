@@ -1,35 +1,32 @@
 import { Context } from 'hono';
 import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, asc } from 'drizzle-orm';
 import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
 
 export const hallOfFameController = {
-  async getRecords(c: Context) {
+  async getHallOfFame(c: Context) {
     try {
       const user = c.get('user');
-      const records = await db.select()
+      const records = await db.select({
+        id: monumentRecords.id,
+        year: monumentRecords.year,
+        eventName: monumentRecords.eventName,
+        distance: monumentRecords.distance,
+        officialTime: monumentRecords.officialTime,
+        pace: monumentRecords.pace,
+        weather: monumentRecords.weather,
+        // polyline é omitida para otimizar o payload da lista
+        isAllTimePr: monumentRecords.isAllTimePr,
+        isYearPr: monumentRecords.isYearPr,
+      })
         .from(monumentRecords)
         .where(eq(monumentRecords.athleteId, user.id))
-        .orderBy(desc(monumentRecords.year));
+        .orderBy(desc(monumentRecords.year), asc(monumentRecords.distance));
       return c.json({ data: records });
     } catch (error) {
       console.error('Erro ao buscar o Hall of Fame:', error);
       return c.json({ error: 'Falha ao buscar os registros do Hall of Fame.' }, 500);
-    }
-  },
-
-  async getYearPrs(c: Context) {
-    try {
-      const user = c.get('user');
-      const records = await db.select()
-        .from(monumentRecords)
-        .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.isYearPr, true)))
-        .orderBy(desc(monumentRecords.year));
-      return c.json({ data: records });
-    } catch (error) {
-      console.error('Erro ao buscar os PRs do Ano:', error);
-      return c.json({ error: 'Falha ao buscar os registros de PRs anuais.' }, 500);
     }
   },
 

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, doublePrecision, boolean, jsonb, unique, customType } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, timestamp, doublePrecision, boolean, jsonb, unique, customType, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Validador centralizado de UUID para blindar o banco e evitar crash (NeonDbError)
@@ -194,4 +194,9 @@ export const monumentRecords = pgTable('monument_records', {
   polyline: text('polyline'),
   isAllTimePr: boolean('is_all_time_pr').default(false),
   isYearPr: boolean('is_year_pr').default(false),
-});
+}, (table) => ({
+  athleteYearIdx: index('monument_athlete_year_idx').on(table.athleteId, table.year),
+  yearPrIdx: index('monument_year_pr_idx').on(table.isYearPr),
+  allTimePrIdx: index('monument_all_time_pr_idx').on(table.isAllTimePr),
+  distanceIdx: index('monument_distance_idx').on(table.distance),
+}));
