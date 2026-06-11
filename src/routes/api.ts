@@ -19,7 +19,9 @@ import hallOfFameRoutes from '@/routes/hallOfFameRoutes';
 
 export const apiRoutes = new Hono();
 
-// 1. ROTAS PÚBLICAS E WEBHOOKS (Devem ser processadas ANTES do middleware JWT)
+// ============================================================================
+// 1. MÓDULO DE AUTOMAÇÃO E TELEMETRIA (Protegidas por Secrets Internos)
+// ============================================================================
 apiRoutes.post('/webhook/telegram', telegramController.handleWebhook);
 apiRoutes.get('/cron/daily', telegramController.handleCron);
 apiRoutes.get('/cron/recalculate', telegramController.handleRecalculate);
@@ -27,14 +29,24 @@ apiRoutes.route('/strava', stravaRoutes);
 apiRoutes.route('/webhook', webhookRoutes);
 apiRoutes.route('/debug', debugRoutes);
 
-// 2. ROTAS PRIVADAS DO APP (Requerem Firebase Auth)
+// ============================================================================
+// 2. MÓDULO DE DOSSIÊS (Autenticação Híbrida: Header ou Query ?token=)
+// ============================================================================
+// Removido do privateAppRoutes para não ser bloqueado pelo middleware estrito.
+apiRoutes.route('/reports', reportRoutes);
+
+// ============================================================================
+// 3. MÓDULO CORE - APP MOBILE (Proteção Estrita via Header Bearer Token)
+// ============================================================================
 const privateAppRoutes = new Hono();
 privateAppRoutes.use('*', firebaseAuthMiddleware);
 
+// 3.1 Identidade e Perfil Clínica
 privateAppRoutes.get('/athlete/profile', athleteController.getProfile);
 privateAppRoutes.get('/athlete/bioimpedance-history', athleteController.getBioimpedanceHistory);
 privateAppRoutes.get('/athlete/dossier', dossierController.getDossier);
-privateAppRoutes.route('/reports', reportRoutes);
+
+// 3.2 Sub-Roteadores de Domínio Tático
 privateAppRoutes.route('/strength', strengthRoutes);
 privateAppRoutes.route('/races', racesRouter);
 privateAppRoutes.route('/import', importRoutes);

@@ -60,7 +60,11 @@ export const stravaController = {
   },
 
   async processActivity(activityId: number): Promise<void> {
-    console.log(`[Strava] Extraindo telemetria da atividade ${activityId}...`);
+    // Portão de Entrada Tático: Array de modalidades permitidas para processamento.
+    const allowedTypes = ['Run', 'VirtualRun', 'Ride', 'VirtualRide', 'WeightTraining', 'Workout'];
+    
+    // Log inicial para rastreabilidade
+    console.log(`[Strava] Recebido gatilho para atividade ${activityId}. Iniciando extração de telemetria...`);
     
     const athlete = await athleteRepository.getPrimaryAthlete();
     if (!athlete) {
@@ -95,8 +99,8 @@ export const stravaController = {
       return;
     }
 
-    if (activity.type !== 'Run') {
-      console.log(`[Strava] Operação ignorada. Atividade não é corrida (Tipo: ${activity.type}).`);
+    if (!allowedTypes.includes(String(activity.type))) {
+      console.log(`[Strava] Operação ignorada. Tipo de atividade não monitorado: ${activity.type}.`);
       return;
     }
 

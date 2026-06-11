@@ -4,7 +4,7 @@ import { athleteRepository } from '@/repositories/athleteRepository';
 import { db } from '@/db';
 import { workoutSessions, strengthLogs, workoutTemplateItems, exerciseLibrary } from '@/db/schema';
 import { env } from '@/config/env';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, max, ilike } from 'drizzle-orm';
 import { getTodayWeather, getCityFromCoordinates } from '@/services/weatherService';
 
 interface StrengthLogPayload {
@@ -30,6 +30,9 @@ export const strengthController = {
   async getTemplateExercises(c: Context) {
     try {
       const templateId = c.req.param('id');
+      const user = c.get('user');
+      // Fallbacks táticos de identidade (Firebase UID -> DB ID)
+      const athleteId = user?.id ?? user?.uid ?? (await athleteRepository.getPrimaryAthlete())?.id;
 
       if (!templateId) {
         return c.json({ error: "O parâmetro ID da ficha é obrigatório.", code: "MISSING_PARAM" }, 400);
@@ -48,7 +51,48 @@ export const strengthController = {
       .innerJoin(exerciseLibrary, eq(workoutTemplateItems.exerciseId, exerciseLibrary.id))
       .where(eq(workoutTemplateItems.templateId, templateId));
 
-      return c.json({ data: exercises }, 200);
+      // Enriquecimento Telemetria de Força: Max Weight (PR) e Last Weight
+      const enrichedExercises = await Promise.all(exercises.map(async (ex) => {
+        let maxWeight = 0;
+        let lastWeight = 0;
+        let history: number[] = [];
+
+        if (athleteId) {
+          const [maxResult, historyResult] = await Promise.all([
+            // Subquery 1: Maior Carga Absoluta (PR Histórico)
+            db.select({ maxWeight: max(strengthLogs.weightUsed) })
+              .from(strengthLogs)
+              .innerJoin(workoutSessions, eq(strengthLogs.sessionId, workoutSessions.id))
+              .where(
+                and(
+                  eq(strengthLogs.exerciseId, ex.exerciseId),
+                  eq(workoutSessions.athleteId, athleteId)
+                )
+              ),
+            // Subquery 2: Histórico das Últimas Cargas (Gráfico de Evolução)
+            db.select({ weightUsed: strengthLogs.weightUsed })
+              .from(strengthLogs)
+              .innerJoin(workoutSessions, eq(strengthLogs.sessionId, workoutSessions.id))
+              .where(
+                and(
+                  eq(strengthLogs.exerciseId, ex.exerciseId),
+                  eq(workoutSessions.athleteId, athleteId)
+                )
+              )
+              .orderBy(desc(workoutSessions.date))
+              .limit(5)
+          ]);
+
+          maxWeight = maxResult[0]?.maxWeight ?? 0;
+          // Inverte o array para que o gráfico fique em ordem cronológica (do mais antigo para o mais novo)
+          history = historyResult.map(r => r.weightUsed ?? 0).reverse();
+          lastWeight = history.length > 0 ? history[history.length - 1] : 0;
+        }
+
+        return { ...ex, maxWeight, lastWeight, history };
+      }));
+
+      return c.json({ data: enrichedExercises }, 200);
     } catch (error) {
       console.error('❌ [STRENGTH CONTROLLER] Erro ao buscar exercícios do template:', error);
       return c.json({ error: "Erro interno ao buscar exercícios.", code: "FETCH_ERR" }, 500);
@@ -134,6 +178,74 @@ export const strengthController = {
     } catch (error) {
       console.error('❌ [STRENGTH CONTROLLER] Erro ao buscar auditoria:', error);
       return c.json({ error: "Erro interno ao buscar a auditoria.", code: "AUDIT_ERR" }, 500);
+    }
+  },
+
+  async searchLibrary(c: Context) {
+    try {
+      const q = c.req.query('q');
+      
+      let results;
+      if (q) {
+        results = await db.select().from(exerciseLibrary)
+          .where(ilike(exerciseLibrary.name, `%${q}%`))
+          .limit(20);
+      } else {
+        results = await db.select().from(exerciseLibrary).limit(20);
+      }
+      
+      return c.json({ data: results }, 200);
+    } catch (error) {
+      console.error('❌ [STRENGTH CONTROLLER] Erro ao buscar biblioteca:', error);
+      return c.json({ error: "Erro interno ao buscar biblioteca.", code: "FETCH_ERR" }, 500);
+    }
+  },
+
+  async addExerciseToTemplate(c: Context) {
+    try {
+      const templateId = c.req.param('id');
+      const body = await c.req.json().catch(() => ({}));
+      const { exerciseId, sets, reps, notes } = body;
+
+      if (!templateId || !exerciseId || sets === undefined || !reps) {
+        return c.json({ error: "Parâmetros obrigatórios ausentes.", code: "MISSING_PARAMS" }, 400);
+      }
+
+      const inserted = await db.insert(workoutTemplateItems).values({
+        templateId,
+        exerciseId,
+        sets: Number(sets),
+        reps: String(reps),
+        notes: notes ? String(notes) : null
+      }).returning();
+
+      return c.json({ data: inserted[0] }, 201);
+    } catch (error) {
+      console.error('❌ [STRENGTH CONTROLLER] Erro ao adicionar exercício:', error);
+      return c.json({ error: "Erro interno ao adicionar exercício.", code: "ADD_ERR" }, 500);
+    }
+  },
+
+  async removeExerciseFromTemplate(c: Context) {
+    try {
+      const itemId = c.req.param('itemId');
+
+      if (!itemId) {
+        return c.json({ error: "Parâmetros na rota ausentes.", code: "MISSING_PARAMS" }, 400);
+      }
+
+      const deleted = await db.delete(workoutTemplateItems)
+        .where(eq(workoutTemplateItems.id, itemId))
+        .returning();
+
+      if (deleted.length === 0) {
+        return c.json({ error: "Exercício não encontrado na ficha.", code: "NOT_FOUND" }, 404);
+      }
+
+      return c.json({ data: { success: true, message: "Exercício removido da ficha." } }, 200);
+    } catch (error) {
+      console.error('❌ [STRENGTH CONTROLLER] Erro ao remover exercício:', error);
+      return c.json({ error: "Erro interno ao remover exercício.", code: "DELETE_ERR" }, 500);
     }
   }
 };
