@@ -1,5 +1,5 @@
 import { db } from './index';
-import { athletes, exercises, shoes, races, consumables, workoutSessions, treadmillIntervals, bioimpedanceLogs, exerciseLibrary, workoutTemplates, workoutTemplateItems } from './schema';
+import { athletes, exercises, shoes, races, consumables, workoutSessions, treadmillIntervals, bioimpedanceLogs, exerciseLibrary, workoutTemplates, workoutTemplateItems, plannedWorkouts, strengthLogs } from './schema';
 
 export async function seed() {
   console.log("🌱 Iniciando o processo de Seed no KINETIX HUB...");
@@ -71,6 +71,7 @@ export async function seed() {
   // 4. CORE DE FORÇA: IRONLOG_V2 (REALIDADE)
   // ==========================================
   console.log("🧹 Limpando Biblioteca de Exercícios e Fichas antigas para atualização...");
+  await db.delete(strengthLogs);
   await db.delete(workoutTemplateItems);
   await db.delete(workoutTemplates);
   await db.delete(exerciseLibrary);
@@ -206,6 +207,99 @@ export async function seed() {
       }
     ]);
   }
+
+  // ==========================================
+  // 6. PLANILHA DA SEMANA (CONTINGÊNCIA CLIMÁTICA)
+  // ==========================================
+  console.log("📅 Inserindo cronograma da semana (Fase 2 - Contingência Climática)...");
+  
+  // Limpar treinos planejados existentes para evitar duplicidade na inserção
+  await db.delete(plannedWorkouts);
+
+  const weeklySchedule = [
+    {
+      athleteId,
+      date: new Date('2026-06-14T10:00:00Z'),
+      activityType: 'REST',
+      title: 'DESCANSO ABSOLUTO (Dia todo)',
+      complianceStatus: 'COMPLETED_NOT_VALIDATED', // Status assumido como concluído no passado
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: 'OFF', musculacao: 'null', bike: 'null' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-15T22:00:00Z'), // 19h BRT
+      activityType: 'RUN',
+      title: 'Longão Regenerativo (19h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '12km @ 07:15 (8,3 km/h)', musculacao: 'null', bike: 'null' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-16T23:00:00Z'), // 20h BRT
+      activityType: 'MIXED',
+      title: 'Tiros Curtos (20h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '6x400m @ 10,6 km/h', musculacao: 'Ficha B (Anterior + Core)', bike: 'null' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-17T22:00:00Z'), // 19h BRT
+      activityType: 'MIXED',
+      title: 'Corrida Leve (19h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '8km @ 07:05 (8,5 km/h)', musculacao: 'Ficha A (Membros Inferiores)', bike: 'null' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-18T23:00:00Z'), // 20h BRT
+      activityType: 'MIXED',
+      title: 'Corrida Regen (20h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '8km @ 08:00 (7,5 km/h)', musculacao: 'null', bike: '60min Giro Livre indolor' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-19T10:00:00Z'), // Dia todo
+      activityType: 'REST',
+      title: 'DESCANSO ABSOLUTO (Dia todo)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: 'OFF', musculacao: 'null', bike: 'null' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-20T10:00:00Z'), // 07h BRT
+      activityType: 'MIXED',
+      title: 'Corrida Leve + Base (07h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '6km @ 07:20 (8,2 km/h)', musculacao: 'Ficha C (Posterior + Core)', bike: '60min Giro Livre indolor' }
+    },
+    {
+      athleteId,
+      date: new Date('2026-06-21T10:00:00Z'), // 07h BRT
+      activityType: 'RUN',
+      title: 'Longão Volume Especial (07h00)',
+      complianceStatus: 'PENDING',
+      mesocycleStage: 2,
+      macrocycleTarget: 'Nike SP City Marathon',
+      details: { corrida: '18km @ 06:45 (8,9 km/h)', musculacao: 'null', bike: 'null' }
+    }
+  ];
+
+  await db.insert(plannedWorkouts).values(weeklySchedule);
 
   console.log("✅ Seed finalizado com sucesso.");
 }

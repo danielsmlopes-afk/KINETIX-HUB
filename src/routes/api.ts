@@ -16,6 +16,7 @@ import { debugRoutes } from '@/routes/debugRoutes';
 import { dossierRoutes } from '@/routes/dossierRoutes';
 import { workoutRoutes } from '@/routes/workoutRoutes';
 import hallOfFameRoutes from '@/routes/hallOfFameRoutes';
+import { encyclopediaRoutes } from '@/routes/encyclopediaRoutes';
 
 export const apiRoutes = new Hono();
 
@@ -55,6 +56,7 @@ privateAppRoutes.route('/gear', gearRoutes);
 privateAppRoutes.route('/dossiers', dossierRoutes);
 privateAppRoutes.route('/workouts', workoutRoutes);
 privateAppRoutes.route('/hall-of-fame', hallOfFameRoutes);
+privateAppRoutes.route('/encyclopedia', encyclopediaRoutes);
 
 // Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);

@@ -5,7 +5,7 @@ import { workoutService } from '@/services/workoutService';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { db } from '@/db';
 import { plannedWorkouts } from '@/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, inArray } from 'drizzle-orm';
 import { StravaService, StravaActivity } from '@/services/stravaService';
 import { telegramMessageService } from '@/services/telegramMessageService';
 import { redisClient } from '@/config/redis';
@@ -127,21 +127,35 @@ export const stravaController = {
 
     const spDateStr = activityDate.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
     
+    // 1. Conversor de Modalidade (Strava -> Kinetix Domain)
+    let expectedType = 'RUN';
+    const currentType = String(activity.type);
+
+    if (['Ride', 'VirtualRide', 'GravelRide', 'EBikeRide'].includes(currentType)) {
+      expectedType = 'BIKE';
+    } else if (['WeightTraining', 'Workout', 'Crossfit'].includes(currentType)) {
+      expectedType = 'STRENGTH';
+    }
+
+    const expectedTypes = expectedType === 'RUN' ? ['RUN', 'RUN_INTERVAL'] : [expectedType];
+
+    // 2. Refatoração da Query no Drizzle para incluir o Filtro Tático de Modalidade
     const plannedList = await db.select().from(plannedWorkouts).where(
       and(
         eq(plannedWorkouts.athleteId, athlete.id),
-        sql`DATE(${plannedWorkouts.date}) = ${spDateStr}`
+        sql`DATE(${plannedWorkouts.date}) = ${spDateStr}`,
+        inArray(plannedWorkouts.activityType, expectedTypes)
       )
-    );
+    ).limit(1);
 
-    const plannedRun = plannedList.find(p => p.activityType === 'RUN' || p.activityType === 'RUN_INTERVAL');
+    const plannedWorkout = plannedList[0];
 
-    if (!plannedRun) {
-      console.log(`[Strava] Nenhuma corrida planejada encontrada para ${spDateStr}. Atividade registrada como Treino Livre.`);
+    if (!plannedWorkout) {
+      console.log(`[Strava] Nenhum treino de ${expectedType} planejado para ${spDateStr}. Atividade registrada como Treino Livre.`);
       return;
     }
 
-    const details = plannedRun.details as { corrida?: string };
+    const details = plannedWorkout.details as { corrida?: string, bike?: string, academia?: string };
     let targetDistanceKm = 0;
     let targetPaceStr = '';
 
@@ -158,7 +172,7 @@ export const stravaController = {
       // Delegação para o novo Protocolo de Esteira Calibrada (V2)
       auditResult = await coachService.auditWorkout(
         activity as unknown as StravaActivity,
-        plannedRun.id,
+        plannedWorkout.id,
         targetDistanceKm,
         targetPaceStr
       );

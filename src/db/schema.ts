@@ -18,6 +18,12 @@ export const safeUuid = customType<{ data: string; driverData: string }>({
   },
 });
 
+export const systemConfigs = pgTable('system_configs', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const athletes = pgTable('athletes', {
   id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
   name: text('name').notNull(),
@@ -194,6 +200,12 @@ export const monumentRecords = pgTable('monument_records', {
   polyline: text('polyline'),
   isAllTimePr: boolean('is_all_time_pr').default(false),
   isYearPr: boolean('is_year_pr').default(false),
+  // Enciclopédia Kinetix
+  activityType: text('activity_type').default('Run'),
+  mapImageUrl: text('map_image_url'),
+  locationCity: text('location_city'),
+  temperature: doublePrecision('temperature'),
+  date: timestamp('date'),
 }, (table) => ({
   athleteYearIdx: index('monument_athlete_year_idx').on(table.athleteId, table.year),
   yearPrIdx: index('monument_year_pr_idx').on(table.isYearPr),
