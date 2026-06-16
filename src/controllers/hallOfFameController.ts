@@ -13,6 +13,7 @@ export const hallOfFameController = {
         year: monumentRecords.year,
         eventName: monumentRecords.eventName,
         distance: monumentRecords.distance,
+        raceCategory: monumentRecords.raceCategory,
         officialTime: monumentRecords.officialTime,
         pace: monumentRecords.pace,
         weather: monumentRecords.weather,
@@ -35,7 +36,7 @@ export const hallOfFameController = {
       const body = await c.req.json();
       const user = c.get('user');
 
-      const { year, eventName, distance, officialTime, pace, weather, polyline, isAllTimePr } = body;
+      const { year, eventName, distance, raceCategory, officialTime, pace, weather, polyline, isAllTimePr } = body;
 
       if (!year || !eventName || !distance || !officialTime || !pace) {
         return c.json({ error: 'Parâmetros obrigatórios ausentes.' }, 400);
@@ -45,7 +46,7 @@ export const hallOfFameController = {
       if (isAllTimePr === true) {
         await db.update(monumentRecords)
           .set({ isAllTimePr: false })
-          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.distance, distance)));
+          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.raceCategory, raceCategory || distance)));
       }
 
       const inserted = await db.insert(monumentRecords).values({
@@ -53,6 +54,7 @@ export const hallOfFameController = {
         year: Number(year),
         eventName,
         distance,
+        raceCategory: raceCategory || null,
         officialTime,
         pace,
         weather: weather || '--',
@@ -85,6 +87,25 @@ export const hallOfFameController = {
       }
       
       const record = records[0];
+
+      // Parsing visual para o formato do PDF
+      let displayDistance = '--';
+      if (record.raceCategory) {
+        const catStr = record.raceCategory.toString().toUpperCase();
+        displayDistance = catStr.endsWith('K') ? catStr.replace('K', ' KM') : catStr;
+      } else if (record.distance) {
+        const distStr = record.distance.toString().toUpperCase();
+        if (distStr.endsWith('K')) {
+          displayDistance = distStr.replace('K', '') + ' KM';
+        } else {
+          const parsed = parseFloat(distStr);
+          if (!isNaN(parsed)) {
+            displayDistance = parsed > 500 ? (parsed / 1000).toFixed(1) + ' KM' : parsed.toFixed(1) + ' KM';
+          } else {
+            displayDistance = distStr;
+          }
+        }
+      }
 
       let base64Map = '';
       if (record.polyline) {
@@ -285,7 +306,7 @@ export const hallOfFameController = {
     <div class="metrics-grid">
       <div class="metric-card">
         <div class="metric-label">DISTANCE</div>
-        <div class="metric-value highlight">${record.distance}</div>
+        <div class="metric-value highlight">${displayDistance}</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">OFFICIAL TIME</div>
@@ -347,7 +368,7 @@ export const hallOfFameController = {
       if (newValue === true) {
         await db.update(monumentRecords)
           .set({ isAllTimePr: false })
-          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.distance, records[0].distance)));
+          .where(and(eq(monumentRecords.athleteId, user.id), eq(monumentRecords.raceCategory, records[0].raceCategory || records[0].distance)));
       }
 
       await db.update(monumentRecords)

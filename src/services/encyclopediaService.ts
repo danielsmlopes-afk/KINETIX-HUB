@@ -61,13 +61,22 @@ export class EncyclopediaService {
         const officialTime = officialTimeH > 0 
           ? `${officialTimeH}:${officialTimeM.toString().padStart(2, '0')}:${officialTimeS.toString().padStart(2, '0')}`
           : `${officialTimeM.toString().padStart(2, '0')}:${officialTimeS.toString().padStart(2, '0')}`;
+          
+        let raceCategory = null;
+        if (isMonument && !isEpicRide) {
+          if (act.distance >= 9800 && act.distance <= 10500) raceCategory = '10K';
+          else if (act.distance >= 20900 && act.distance <= 21500) raceCategory = '21K';
+          else if (act.distance >= 41800 && act.distance <= 42500) raceCategory = '42K';
+          else raceCategory = `${Number.isInteger(distKm) ? distKm : distKm.toFixed(1)}K`;
+        }
 
         await db.insert(monumentRecords).values({
           athleteId: athleteId,
           year,
           eventName: act.name || 'Strava Activity',
           activityType: act.type,
-          distance: act.distance?.toString() || '0',
+          distance: distKm.toString(),
+          raceCategory: raceCategory,
           officialTime,
           pace,
           mapImageUrl: act.map?.summary_polyline || null,
@@ -119,7 +128,15 @@ export class EncyclopediaService {
       }
 
       if (record.activityType === 'Run') {
-        data[year].volumeCorridas += (parseFloat(record.distance || '0') || 0) / 1000;
+        let distKm = 0;
+        const distStr = record.distance?.toString().toUpperCase() || '0';
+        if (distStr.endsWith('K')) {
+          distKm = parseFloat(distStr.replace('K', '')) || 0;
+        } else {
+          const parsed = parseFloat(distStr) || 0;
+          distKm = parsed > 500 ? parsed / 1000 : parsed;
+        }
+        data[year].volumeCorridas += distKm;
         
         const timeParts = (record.officialTime || '0').split(':').map(Number);
         let minutes = 0;

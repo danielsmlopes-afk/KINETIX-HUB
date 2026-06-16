@@ -1,0 +1,1 @@
+ALTER TABLE "monument_records" ADD COLUMN "race_category" text;

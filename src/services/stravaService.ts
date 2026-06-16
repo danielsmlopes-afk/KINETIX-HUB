@@ -260,7 +260,8 @@ export class StravaService {
         athleteId: athlete.id,
         year,
         eventName: act.name,
-        distance: targetDist,
+        distance: distanceKm.toString(),
+        raceCategory: targetDist,
         officialTime,
         pace,
         weather: '--', // Sem dados históricos detalhados fáceis no Strava grátis (fallback)

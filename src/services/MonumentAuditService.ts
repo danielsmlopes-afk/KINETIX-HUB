@@ -39,24 +39,24 @@ export class MonumentAuditService {
       // Se bater PR absoluto, rebaixa os anteriores da mesma distância
       if (isAllTimePr) {
         existingMonuments.forEach(m => {
-          if (m.distance === categoryMatch.name) m.isAllTimePr = false;
+          if ((m.raceCategory || m.distance) === categoryMatch.name) m.isAllTimePr = false;
         });
         await db.update(monumentRecords)
           .set({ isAllTimePr: false })
-          .where(and(eq(monumentRecords.athleteId, athlete.id), eq(monumentRecords.distance, categoryMatch.name)));
+          .where(and(eq(monumentRecords.athleteId, athlete.id), eq(monumentRecords.raceCategory, categoryMatch.name)));
       }
 
       // Se bater PR do ano, rebaixa os anteriores da mesma distância naquele ano
       if (isYearPr) {
         existingMonuments.forEach(m => {
-          if (m.distance === categoryMatch.name && m.year === year) m.isYearPr = false;
+          if ((m.raceCategory || m.distance) === categoryMatch.name && m.year === year) m.isYearPr = false;
         });
         await db.update(monumentRecords)
           .set({ isYearPr: false })
           .where(
             and(
               eq(monumentRecords.athleteId, athlete.id),
-              eq(monumentRecords.distance, categoryMatch.name),
+              eq(monumentRecords.raceCategory, categoryMatch.name),
               eq(monumentRecords.year, year)
             )
           );
@@ -66,7 +66,8 @@ export class MonumentAuditService {
         athleteId: athlete.id,
         year,
         eventName: race.name,
-        distance: categoryMatch.name,
+        distance: categoryMatch.exactDistance.toString(),
+        raceCategory: categoryMatch.name,
         officialTime,
         pace,
         weather: race.weather || '--',
@@ -118,14 +119,14 @@ export class MonumentAuditService {
   }
 
   private checkAllTimePr(newTimeSeconds: number, distanceName: string, existingMonuments: any[]): boolean {
-    const records = existingMonuments.filter(m => m.distance === distanceName);
+    const records = existingMonuments.filter(m => (m.raceCategory || m.distance) === distanceName);
     if (records.length === 0) return true;
     const bestTime = Math.min(...records.map(r => this.timeToSeconds(r.officialTime)));
     return newTimeSeconds < bestTime;
   }
 
   private checkYearPr(newTimeSeconds: number, distanceName: string, year: number, existingMonuments: any[]): boolean {
-    const records = existingMonuments.filter(m => m.distance === distanceName && m.year === year);
+    const records = existingMonuments.filter(m => (m.raceCategory || m.distance) === distanceName && m.year === year);
     if (records.length === 0) return true;
     const bestTime = Math.min(...records.map(r => this.timeToSeconds(r.officialTime)));
     return newTimeSeconds < bestTime;

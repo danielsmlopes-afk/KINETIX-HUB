@@ -194,6 +194,7 @@ export const monumentRecords = pgTable('monument_records', {
   year: integer('year').notNull(),
   eventName: text('event_name').notNull(),
   distance: text('distance').notNull(),
+  raceCategory: text('race_category'),
   officialTime: text('official_time').notNull(),
   pace: text('pace').notNull(),
   weather: text('weather'),
