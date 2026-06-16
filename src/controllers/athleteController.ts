@@ -1,7 +1,7 @@
 // Arquivo: src/controllers/athleteController.ts
 import { Context } from 'hono';
 import { db } from '@/db';
-import { athletes, bioimpedanceLogs, races, plannedWorkouts } from '@/db/schema';
+import { athletes, bioimpedanceLogs, races, plannedWorkouts, healthLogs } from '@/db/schema';
 import { eq, desc, gte, lt, and, asc } from 'drizzle-orm';
 import { getTodayWeather, getTomorrowWeather } from '@/services/weatherService';
 import { redisClient } from '@/config/redis';
@@ -37,6 +37,15 @@ export const athleteController = {
         muscleMass: bioList[0].muscleMass,
         fatPercentage: bioList[0].bodyFat // Mapeamento DB -> Contrato Mobile
       } : undefined;
+
+      // 2.5 Busca a Última Telemetria de Biossensores (Health Connect)
+      const healthList = await db.select()
+        .from(healthLogs)
+        .where(eq(healthLogs.athleteId, athlete.id))
+        .orderBy(desc(healthLogs.date))
+        .limit(1);
+      
+      const latestHealthMetrics = healthList.length > 0 ? healthList[0] : undefined;
 
       // 3. Busca Próximas Provas Alvo
       const today = new Date();
@@ -144,6 +153,7 @@ export const athleteController = {
         homeLat: athlete.homeLat,
         homeLon: athlete.homeLon,
         latestBioimpedance: latestBio, 
+        latestHealthMetrics,
         upcomingRaces, 
         pastRaces,
         upcomingWorkouts,

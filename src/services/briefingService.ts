@@ -1,5 +1,5 @@
-import { InferSelectModel, and, eq, gte, lte } from 'drizzle-orm';
-import { plannedWorkouts, athletes } from '../db/schema';
+import { InferSelectModel, and, eq, gte, lte, desc } from 'drizzle-orm';
+import { plannedWorkouts, athletes, healthLogs } from '../db/schema';
 import { db } from '@/db';
 import { askHeadCoach } from './headCoachService';
 import { env } from '@/config/env';
@@ -68,6 +68,22 @@ Use um tom clínico, focado em performance e proteção.`;
     const seriePrincipal = seriePrincipalParts.length > 0 ? seriePrincipalParts.join(' + ') : 'Treino Base';
     const restDetails = details?.restDetails ?? null;
 
+    // PARTE 1.2: Extração de Biossensores (Readiness e Histórico de VFC)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const healthHistory = await db.select()
+      .from(healthLogs)
+      .where(and(
+        eq(healthLogs.athleteId, workout.athleteId),
+        gte(healthLogs.date, sevenDaysAgo)
+      ))
+      .orderBy(desc(healthLogs.date));
+    
+    const latestHealth = healthHistory.length > 0 ? healthHistory[0] : null;
+    // Inverte para a ordem cronológica (mais antigo -> mais novo) para análise de tendência
+    const hrvHistory = healthHistory.map(log => log.hrv).filter(hrv => hrv != null).reverse(); 
+
     // PARTE 1.5: Motor de Sumário Tático (Calcula a cadência da semana corrente)
     let tacticalSummary = '';
     try {
@@ -114,7 +130,29 @@ Use um tom clínico, focado em performance e proteção.`;
     const popStr = await this.getWeatherPoP();
     const visualWeather = await getTomorrowWeather(); // Integração de Log Visual via OpenWeatherMap
     
-    const systemPrompt = this.getLogisticsSystemPrompt();
+    let systemPrompt = this.getLogisticsSystemPrompt();
+
+    // Injeta o contexto de Readiness no cérebro da IA
+    if (latestHealth) {
+      const healthContextPrompt = `
+### ⚜️ TELEMETRIA BIOLÓGICA (BIOSSENSORES)
+O Atleta sincronizou os seguintes biossensores referentes à última noite (Health Connect):
+- 🛌 Horas de Sono: ${latestHealth.sleepHours || 'N/D'}h
+- 🌊 VFC (Variabilidade da Freq. Cardíaca): ${latestHealth.hrv || 'N/D'} ms
+- ❤️ Frequência Cardíaca de Repouso: ${latestHealth.restingHeartRate || 'N/D'} bpm
+- 👣 Passos Ontem: ${latestHealth.steps || 0} passos
+
+**Histórico de VFC (Últimos 7 dias, do mais antigo ao mais recente):**
+${hrvHistory.length > 0 ? `[${hrvHistory.join('ms, ')}ms]` : 'Nenhum histórico disponível.'}
+
+**Diretriz de Adaptação Clínica (Head Coach):**
+1. **Análise de Tendência:** Uma tendência de *queda* consistente na VFC ao longo da semana indica fadiga acumulada e risco de overtraining.
+2. **Análise Pontual:** Se o sono for < 6h ou a VFC de hoje estiver notavelmente baixa em relação à média da semana, adicione um alerta no briefing sugerindo "Redução de Carga (Deload Tático)" ou hidratação extra.
+3. **Ação:** Não seja alarmista, mas atue como um treinador de elite ajustando a severidade do treino do dia caso a prontidão biológica (Readiness), especialmente a tendência da VFC, esteja comprometida.
+`;
+      systemPrompt += healthContextPrompt;
+    }
+
     const userPrompt = `Alvo: ${workout.title}\nTipo: ${workout.activityType}\nSérie Principal: ${seriePrincipal}`;
     const aiResponse = await askHeadCoach(userPrompt, undefined, systemPrompt);
 
