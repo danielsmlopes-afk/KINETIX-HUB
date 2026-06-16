@@ -22,3 +22,7 @@ O serviço `cardioEfficiencyService.ts` foi promovido para "Operação Fogo Real
 
 ## Auditoria de Monumentos (Monument Audit)
 O serviço `MonumentAuditService.ts` atua como o árbitro homologador do Hall of Fame. Ele varre a tabela `races` procurando operações completadas dentro das tolerâncias estritas de distância (10K, 15K, 21K, 42K) e promove estes registros para a tabela `monumentRecords`. Ele isola a telemetria, limpa o pace (focado na distância de chancela, não no ruído do GPS) e automaticamente rebaixa registros defasados caso a nova prova represente um Recorde Absoluto (`isAllTimePr`) ou do Ano (`isYearPr`).
+
+## Ingestão de Biossensores (Health Connect)
+
+Embora a extração física ocorra no Frontend (Flutter via `health_service.dart` e `FlutterFragmentActivity`), o ecossistema atua em conjunto despachando a carga via Webhook (`/webhook/health-sync`). O fluxo valida as métricas absolutas capturadas do Android 14+ (Passos Totais, VFC, Frequência Cardíaca de Repouso e Horas de Sono) e orquestra a injeção nas matrizes de telemetria biológica para balizar as avaliações de prontidão (*Readiness*) da Inteligência Artificial.

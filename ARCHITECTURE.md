@@ -42,7 +42,7 @@ O KINETIX HUB opera com **Fuso Horário Oficial Blindado em América/Sao_Paulo (
 
 * **Backend**: Node.js + Hono (API REST leve e rápida). Validações rígidas de Schema com Zod.
 * **Database**: Neon (PostgreSQL Serverless) gerenciado com Drizzle ORM (tipagem estrita, zero 'any').
-* **Frontend**: Aplicativo Flutter com **Clean Architecture**, isolando lógicas de Apresentação (UI) das camadas de Domínio e Dados (API), agrupadas por `features` (`spreadsheet`, `dashboard`).
+* **Frontend**: Aplicativo Flutter com **Clean Architecture**, isolando lógicas de Apresentação (UI) das camadas de Domínio e Dados (API), agrupadas por `features` (`spreadsheet`, `dashboard`). Integrado nativamente ao **Google Health Connect** (Android 14+ / SDK 36) operando via `FlutterFragmentActivity` para coleta de biossensores.
 * **Motor de IA**: Gemini 2.5 Flash / Groq operando a inteligência tática (*Head Coach*).
 * **Integrações**: Strava Webhooks, Telegram Bot API, OpenWeatherMap.
 * **Motor Cartográfico Interno (MapStatic)**: Instância própria operando via Docker que garante a **Soberania Cartográfica** da plataforma. A plotagem de *polylines* nos relatórios em PDF ocorre estritamente dentro da rede interna, sem vazar dados sigilosos de geolocalização do Strava para APIs cartográficas de terceiros.
@@ -161,6 +161,7 @@ kinetix_app/
 * **`[lab_screen.dart]`** (`kinetix_app/lib/features/laboratory/lab_screen.dart`): Tela principal do Laboratório. Consome a rota `/api/strength/templates` para listar as fichas de treino (A, B, C) disponíveis para o atleta.
 * **`[iron_log_screen.dart]`** (`kinetix_app/lib/features/laboratory/iron_log_screen.dart`): Interface de registro do treino de força (IronLog). Ao receber uma ficha, busca seus exercícios e permite que o atleta insira a carga (kg) e repetições realizadas, persistindo a sessão via `POST /api/strength/log`.
 * **`[reports_screen.dart]`** (`kinetix_app/lib/features/dossiers/reports_screen.dart`): Tela que exibe relatórios e aciona a visualização nativa embutida através de streaming do motor vetorial Hono para o `PdfViewerScreen`.
+* **`[health_service.dart]`** (`kinetix_app/lib/core/services/health_service.dart`): Motor de extração de Biossensores no App. Configurado exclusivamente para o Google Health Connect (Android 14+), consolidando Passos, Sono, VFC (SDNN) e Frequência Cardíaca de Repouso.
 
 ---
 

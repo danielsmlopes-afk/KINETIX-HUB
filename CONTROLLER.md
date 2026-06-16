@@ -40,6 +40,7 @@ Lida com a extração e despacho de Dossiês Vetoriais (PDFs).
 - **Operação Autônoma:** Portal de entrada exclusivo para os disparos automáticos via Cronjobs (ex: cron-job.org ou trigger de relógio do sistema).
 - **Disparo Manual (Painel IA):** O `handleManualTrigger` intercepta chamadas via UI (Flutter) e roteia os payloads `{ jobId: '...' }` diretamente para os Services (`morningRaceService`, `briefingService`), ignorando o relógio mestre. Valida rigorosamente a presença do cabeçalho `x-cron-secret`.
 - **Despacho Dominical:** Intercepta as chamadas como `triggerWeeklyReport`, validando obrigatoriamente a assinatura de segurança `x-cron-secret` antes de notificar o Telegram ou processar os deltas da semana no banco de dados.
+- **Telemetria Biológica (`/webhook/health-sync`):** Intercepta o payload validado pelo App Mobile (oriundo do Google Health Connect / Apple Health) contendo biossensores críticos (Passos, VFC, FC Repouso, Horas de Sono) para atualização estrutural do estado biológico e prontidão do atleta.
 
 ---
 
