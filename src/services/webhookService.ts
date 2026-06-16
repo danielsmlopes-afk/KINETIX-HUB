@@ -6,7 +6,7 @@ import { generateRaceBriefingPdf } from '@/services/pdf/raceBriefingService';
 import { telegramMessageService } from '@/services/telegramMessageService';
 import { StravaService } from '@/services/stravaService';
 import { db } from '@/db'; 
-import { plannedWorkouts, workoutSessions, races, monumentRecords, cronLogs } from '@/db/schema';
+import { plannedWorkouts, workoutSessions, races, monumentRecords, cronLogs, healthLogs } from '@/db/schema';
 import { eq, and, sql, isNull, gte, lte, inArray, desc } from 'drizzle-orm';
 import { coachService } from '@/services/coachService';
 import { askHeadCoach, askHeadCoachForRecalculation } from '@/services/headCoachService';
@@ -139,6 +139,34 @@ export const webhookService = {
 
   async processJointCheckin() {
     const msg = `🦾 *Check-in Articular Diário*\n\nComo está o chassi hoje, comandante? Há algum desconforto agudo nos joelhos, panturrilhas ou ombro?\n\nSe existir alguma restrição clínica, responda com o comando:\n\`/dor <nota de 1 a 10> <local da dor>\`\n\n_Exemplo:_ \`/dor 4 joelho direito\``;
+    await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), msg);
+  },
+
+  async processHealthReport() {
+    const athlete = await athleteRepository.getPrimaryAthlete();
+    if (!athlete) return;
+
+    // Busca o log de biossensores mais recente salvo hoje
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const logs = await db.select().from(healthLogs)
+      .where(and(eq(healthLogs.athleteId, athlete.id), sql`DATE(${healthLogs.date}) = ${todayStr}`))
+      .orderBy(desc(healthLogs.date))
+      .limit(1);
+
+    if (logs.length === 0) {
+      console.log('[Webhook] Nenhum biossensor sincronizado hoje para o Health Report.');
+      return;
+    }
+
+    const log = logs[0];
+    
+    const contextData = { passos: log.steps, sono: log.sleepHours, vfc: log.hrv, fcRepouso: log.restingHeartRate };
+    const prompt = `Analise os seguintes biossensores do atleta extraídos hoje: Passos: ${log.steps}, Sono: ${log.sleepHours}h, VFC: ${log.hrv}ms, Frequência Cardíaca de Repouso: ${log.restingHeartRate} bpm. Dê um parecer tático e rápido (máx 3 linhas) sobre o estado de fadiga do sistema nervoso e a prontidão do atleta para carga de treinos. Aja como um fisiologista esportivo direto ao ponto.`;
+    
+    const aiAnalysis = await askHeadCoach(prompt, contextData);
+
+    const msg = `📊 *TELEMETRIA DIÁRIA (18h00)* 📊\n\n👣 *Passos:* ${log.steps}\n💤 *Sono:* ${log.sleepHours}h\n💓 *VFC:* ${log.hrv} ms\n🫀 *BPM Repouso:* ${log.restingHeartRate}\n\n🧠 *Parecer Fisiológico:*\n${aiAnalysis}`;
+    
     await telegramMessageService.sendSimpleMessage(Number(env.TELEGRAM_CHAT_ID), msg);
   },
 

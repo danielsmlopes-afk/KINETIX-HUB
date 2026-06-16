@@ -7,6 +7,9 @@ import { weatherPacingService } from '@/services/weatherPacingService';
 import { morningRaceService } from '@/services/morningRaceService';
 import { briefingService } from '@/services/briefingService';
 import { webhookService } from '@/services/webhookService';
+import { db } from '@/db';
+import { healthLogs } from '@/db/schema';
+import { athleteRepository } from '@/repositories/athleteRepository';
 
 const isAuth = (c: Context) => c.req.header('x-cron-secret') === env.CRON_SECRET;
 const authError = (c: Context) => c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
@@ -117,6 +120,12 @@ export const webhookController = {
     return c.text('OK', 200);
   },
 
+  triggerHealthReport: async (c: Context) => {
+    if (!isAuth(c)) return authError(c);
+    webhookService.processHealthReport().catch(e => console.error('[Webhook] HealthReport Erro:', e));
+    return c.text('OK', 200);
+  },
+
   handleSundaySync: async (c: Context) => {
     if (!isAuth(c)) return authError(c);
     try {
@@ -124,6 +133,70 @@ export const webhookController = {
       return c.json({ data: { message: 'Sunday Sync executado com sucesso.', syncedRaces: syncedCount } }, 200);
     } catch (error: any) {
       return c.json({ error: 'Falha no webhook dominical', details: error.message }, 500);
+    }
+  },
+
+  sendDossierToTelegram: async (c: Context) => {
+    try {
+      const body = await c.req.json();
+      const { filename, pdfBase64, caption } = body;
+
+      const botToken = process.env.TELEGRAM_BOT_TOKEN; 
+      const chatId = process.env.TELEGRAM_CHAT_ID; 
+
+      if (!botToken || !chatId) {
+        return c.json({ error: 'Telemetria do Telegram não configurada.' }, 500);
+      }
+
+      // Converte o Base64 gerado pelo Flutter de volta para um formato de Arquivo Binário (Blob/Buffer)
+      const buffer = Buffer.from(pdfBase64, 'base64');
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      const formData = new FormData();
+      formData.append('chat_id', chatId);
+      formData.append('document', blob, filename || 'KINETIX_Dossier.pdf');
+      
+      // Anexa a legenda tática com suporte a formatação
+      const defaultCaption = `🛡️ *DOSSIÊ TÁTICO*\n\nDocumento: \`${filename || 'KINETIX_Dossier.pdf'}\`\n\n_Extraído via Kinetix Hub._`;
+      formData.append('caption', caption || defaultCaption);
+      formData.append('parse_mode', 'Markdown');
+
+      // Dispara o payload usando a documentação oficial Multipart/FormData do Telegram
+      const tgUrl = `https://api.telegram.org/bot${botToken}/sendDocument`;
+      const response = await fetch(tgUrl, { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        const tgError = await response.text();
+        console.error('⚠️ [Telegram] Falha ao enviar documento:', tgError);
+        throw new Error('Falha na comunicação nativa com o Telegram.');
+      }
+
+      return c.json({ data: { message: 'Dossiê enviado com sucesso ao Head Coach IA.' } });
+    } catch (error: any) {
+      console.error('⚠️ Falha ao processar dossiê para o Telegram:', error);
+      return c.json({ error: error.message }, 500);
+    }
+  },
+
+  syncHealthData: async (c: Context) => {
+    try {
+      const body = await c.req.json();
+      console.log('📡 [Health Sync] Biossensores recebidos do celular:', body);
+      
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      if (athlete) {
+        await db.insert(healthLogs).values({
+          athleteId: athlete.id,
+          date: new Date(),
+          steps: body.steps || 0,
+          sleepHours: body.sleepHours || 0,
+          hrv: body.hrv || 0,
+          restingHeartRate: body.restingHeartRate || 0,
+        });
+      }
+      return c.json({ data: { message: 'Telemetria biológica recebida com sucesso pelo Head Coach IA.' } });
+    } catch (error: any) {
+      console.error('⚠️ [Health Sync] Falha ao sincronizar biossensores:', error);
+      return c.json({ error: error.message }, 500);
     }
   }
 };

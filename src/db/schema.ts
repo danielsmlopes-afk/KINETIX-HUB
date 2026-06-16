@@ -212,3 +212,13 @@ export const monumentRecords = pgTable('monument_records', {
   allTimePrIdx: index('monument_all_time_pr_idx').on(table.isAllTimePr),
   distanceIdx: index('monument_distance_idx').on(table.distance),
 }));
+
+export const healthLogs = pgTable('health_logs', {
+  id: safeUuid('id').default(sql`gen_random_uuid()`).primaryKey(),
+  athleteId: safeUuid('athlete_id').references(() => athletes.id).notNull(),
+  date: timestamp('date').notNull(),
+  steps: integer('steps').default(0),
+  sleepHours: doublePrecision('sleep_hours').default(0),
+  hrv: doublePrecision('hrv').default(0),
+  restingHeartRate: doublePrecision('resting_heart_rate').default(0),
+});

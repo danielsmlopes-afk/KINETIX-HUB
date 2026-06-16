@@ -43,6 +43,14 @@ export const runDigitalTwinJob = async () => {
   }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
 };
 
+export const runHealthReportJob = async () => {
+  console.log('[Cron] Acionando Gateway Webhook: Relatório de Biossensores Diário');
+  await fetch(`${localWebhookUrl}/health-report`, {
+    method: 'POST',
+    headers: { 'x-cron-secret': env.CRON_SECRET }
+  }).catch(err => console.error('[Cron] Falha de comunicação interna:', err));
+};
+
 export const startCronJobs = () => initCronJobs();
 
 export const initCronJobs = () => {
@@ -68,6 +76,9 @@ export const initCronJobs = () => {
 
   // 23:30 - Recálculo de Rotas / Auditoria de Compliance MISSED
   cron.schedule('30 23 * * *', runRouteRecalculationJob, { timezone: 'America/Sao_Paulo' });
+
+  // 18:00 - Resumo Fisiológico Diário (Apple Health / Google Fit)
+  cron.schedule('0 18 * * *', runHealthReportJob, { timezone: 'America/Sao_Paulo' });
 
   // ----------------------------------------------------------------------
   // NOVOS CRON-JOBS BIOLÓGICOS E LOGÍSTICOS

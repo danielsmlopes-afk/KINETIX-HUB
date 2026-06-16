@@ -21,9 +21,9 @@ date,day,name,warmup,cooldown,restDetails,corrida,academia,bike
 "2026-06-11,Qui,Corrida Regen,null,null,null,""8km @ 08:00 (7,5 km/h) [Entrada Direta]"",null,55min Giro Livre indolor"
 2026-06-12,Sex,DESCANSO ABSOLUTO,null,null,null,OFF,null,null
 "2026-06-13,Sáb,Corrida Leve,null,null,null,""5km @ 07:20 (8,2 km/h) [Entrada Direta]"",Ficha C (Posterior + Core),null"
-"2026-06-14,Dom,Longão Regenerativo,null,null,null,""12km @ 07:15 (8,3 km/h)"",null,null"
-2026-06-15,Seg,DESCANSO ABSOLUTO,null,null,null,OFF,null,null
-"2026-06-16,Ter,Volume Tiros,""2.0 km @ 6,5 km/h"",""1.5 km @ 4,5 km/h"",""1'00"""" Passivo (Pé de lado)"",""10x400m @ 10,6 km/h (Pace 05:40)"",Ficha B (Anterior + Core),null"
+"2026-06-15,Seg,Longão Regenerativo,null,null,null,""12km @ 07:15 (8,3 km/h)"",null,null"
+2026-06-14,Dom,DESCANSO ABSOLUTO,null,null,null,OFF,null,null
+"2026-06-16,Ter,Volume Tiros,""2.0 km @ 6,5 km/h"",""1.5 km @ 4,5 km/h"",""1'00"""" Passivo (Pé de lado)"",""6x400m @ 10,6 km/h (Pace 05:40)"",Ficha B (Anterior + Core),null"
 "2026-06-17,Qua,Corrida Leve,null,null,null,""8km @ 07:05 (8,5 km/h) [Entrada Direta]"",Ficha A (Membros Inferiores),null"
 "2026-06-18,Qui,Corrida Regen,null,null,null,""8km @ 08:00 (7,5 km/h) [Entrada Direta]"",null,60min Giro Livre indolor"
 2026-06-19,Sex,DESCANSO ABSOLUTO,null,null,null,OFF,null,null
