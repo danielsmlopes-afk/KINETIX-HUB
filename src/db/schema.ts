@@ -114,6 +114,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   warmup: text('warmup'),
   cooldown: text('cooldown'),
   mapPolyline: text('map_polyline'),
+  mapImageUrl: text('map_image_url'),
+  mapGeojsonUrl: text('map_geojson_url'),
   weather: text('weather'),
 });
 

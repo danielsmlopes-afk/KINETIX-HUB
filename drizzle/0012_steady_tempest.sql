@@ -1,0 +1,1 @@
+ALTER TABLE "workout_sessions" ADD COLUMN "map_image_url" text;

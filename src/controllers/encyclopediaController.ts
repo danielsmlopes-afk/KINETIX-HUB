@@ -1,62 +1,86 @@
 import { Context } from 'hono';
-import { EncyclopediaService } from '../services/encyclopediaService';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 
-export class EncyclopediaController {
-  /**
-   * GET /api/encyclopedia
-   * Retorna o payload estratificado e agrupado por anos, com a flag de cache control
-   */
-  static async getEncyclopedia(c: Context) {
-    try {
-      const payload = await EncyclopediaService.getEncyclopediaData();
+export const getEncyclopedia = async (c: Context) => {
+  try {
+    const athleteId = c.get('athleteId') || c.req.header('athleteId');
+
+    // 1. Volume anual total de TODAS as atividades do ano
+    // Conversão de metros para KM e segundos para Horas (1 casa decimal)
+    const volumeQuery = await db.execute(sql`
+      SELECT 
+        EXTRACT(YEAR FROM date)::int AS "year",
+        ROUND((SUM(distance) / 1000.0)::numeric, 1) AS "volumeCorridas",
+        ROUND((SUM(moving_time) / 3600.0)::numeric, 1) AS "tempoRuas"
+      FROM workout_sessions
+      WHERE athlete_id = ${athleteId}
+      GROUP BY EXTRACT(YEAR FROM date)
+    `);
+
+    // 2. Extração das provas com propriedades exatas solicitadas
+    const provasQuery = await db.execute(sql`
+      SELECT 
+        id,
+        event_name AS "eventName",
+        TO_CHAR(date, 'YYYY-MM-DD') AS "date",
+        distance,
+        official_time AS "officialTime",
+        pace,
+        location_city,
+        temperature,
+        map_image_url,
+        is_year_pr AS "isYearPr",
+        is_all_time_pr AS "isAllTimePr"
+      FROM monument_records
+      WHERE athlete_id = ${athleteId}
+      ORDER BY date DESC
+    `);
+
+    const encyclopediaData: Record<number, any> = {};
+
+    // Injeta os Volumes Anuais Agrupados
+    for (const row of volumeQuery.rows) {
+      const year = row.year as number;
+      encyclopediaData[year] = {
+        volumeCorridas: row.volumeCorridas !== null ? Number(row.volumeCorridas) : null,
+        tempoRuas: row.tempoRuas !== null ? Number(row.tempoRuas) : null,
+        provas: [],
+        epicRides: [] // Preservado para retrocompatibilidade no app Mobile
+      };
+    }
+
+    // Mapeamento Estrito e Proteção contra Nulos para o App
+    for (const row of provasQuery.rows) {
+      const year = row.date ? parseInt((row.date as string).substring(0, 4), 10) : new Date().getFullYear();
       
-      // Determina a Base URL dinamicamente para construir links absolutos
-      // Isso garante que o Flutter consiga baixar a imagem via http.get()
-      const reqUrl = new URL(c.req.url);
-      const baseUrl = process.env.API_BASE_URL || reqUrl.origin;
-
-      // Injeta o Proxy Cartográfico em todos os anos
-      const formattedData: Record<string, any> = {};
-      for (const year in payload.data) {
-        const yearData = payload.data[year];
-        
-        const buildMapUrl = (act: any) => {
-          const polyline = act.map_polyline || act.mapPolyline;
-          if (polyline) {
-            return `${baseUrl}/api/reports/maps/render?polyline=${encodeURIComponent(polyline)}`;
-          }
-          return act.mapImageUrl || act.map_image_url;
-        };
-
-        formattedData[year] = {
-          ...yearData,
-          provas: yearData.provas?.map((act: any) => ({ ...act, mapImageUrl: buildMapUrl(act) })) || [],
-          epicRides: yearData.epicRides?.map((act: any) => ({ ...act, mapImageUrl: buildMapUrl(act) })) || []
-        };
+      if (!encyclopediaData[year]) {
+        encyclopediaData[year] = { volumeCorridas: null, tempoRuas: null, provas: [], epicRides: [] };
       }
 
-      // Retorna exatamente a estrutura exigida: { lastUpdate: ..., data: { "2026": {...} } }
-      return c.json({
-        lastUpdate: payload.lastUpdate,
-        data: formattedData
+      encyclopediaData[year].provas.push({
+        id: row.id ?? null,
+        eventName: row.eventName ?? null,
+        date: row.date ?? null,
+        distance: row.distance !== null ? Number(row.distance) : null,
+        officialTime: row.officialTime ?? null,
+        pace: row.pace ?? null,
+        location_city: row.location_city ?? null,
+        temperature: row.temperature !== null ? Number(row.temperature) : null,
+        map_image_url: row.map_image_url ?? null,
+        isYearPr: row.isYearPr ?? null,
+        isAllTimePr: row.isAllTimePr ?? null,
       });
-    } catch (error: any) {
-      console.error('⚠️ [Encyclopedia] Falha na extração de dados históricos:', error);
-      return c.json({ error: 'Falha ao buscar a enciclopédia Kinetix.' }, 500);
     }
-  }
 
-  /**
-   * GET /api/encyclopedia/version
-   * Retorna apenas a versão (timestamp) para controle de cache offline-first
-   */
-  static async getVersion(c: Context) {
-    try {
-      const lastUpdate = await EncyclopediaService.getEncyclopediaVersion();
-      return c.json({ lastUpdate });
-    } catch (error: any) {
-      console.error('⚠️ [Encyclopedia] Falha na extração da versão:', error);
-      return c.json({ error: 'Falha ao buscar a versão.' }, 500);
-    }
+    return c.json({
+      success: true,
+      lastUpdate: Date.now().toString(),
+      data: encyclopediaData
+    });
+
+  } catch (error) {
+    console.error('💥 Erro no Endpoint da Enciclopédia:', error);
+    return c.json({ success: false, error: 'Internal Server Error' }, 500);
   }
-}
+};
