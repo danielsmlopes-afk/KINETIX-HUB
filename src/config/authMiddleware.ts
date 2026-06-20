@@ -2,12 +2,31 @@ import { Context, Next } from 'hono';
 import { firebaseAdmin } from '@/config/firebase';
 import { athleteRepository } from '@/repositories/athleteRepository';
 import { redisClient } from '@/config/redis';
+import { env } from '@/config/env';
 
 // Fallback em memória caso o Redis não esteja disponível na env
 let localAthleteId: string | null = null;
 let localCacheExpiration = 0;
 
 export const firebaseAuthMiddleware = async (c: Context, next: Next) => {
+  // DX: Permite bypass de autenticação em ambiente local (desenvolvimento) para facilitar testes
+  if (env.BYPASS_AUTH_LOCAL === 'true') {
+    let athleteId = localAthleteId;
+    if (!athleteId) {
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      if (athlete) {
+        athleteId = athlete.id;
+        localAthleteId = athleteId;
+      }
+    }
+    c.set('user', {
+      uid: 'bypass-local-user-uid',
+      email: 'bypass-local@kinetix-hub.com',
+      id: athleteId
+    });
+    return await next();
+  }
+
   const authHeader = c.req.header('Authorization');
   let token = '';
 

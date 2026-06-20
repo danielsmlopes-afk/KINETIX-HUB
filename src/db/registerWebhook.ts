@@ -1,7 +1,7 @@
 import { env } from '@/config/env';
 
 async function register() {
-  const callbackUrl = 'https://kinetix-api-7jld.onrender.com/api/strava/webhook';
+  const callbackUrl = `${process.env.RENDER_EXTERNAL_URL || 'https://kinetix-api-7jld.onrender.com'}/api/strava/webhook`;
 
   // 1. Verifica se já existe um webhook registrado
   console.log('🔍 Verificando webhooks existentes...');

@@ -1,10 +1,10 @@
+import { env } from '@/config/env';
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
 import * as admin from 'firebase-admin';
 import path from 'path';
 import fs from 'fs';
 import polyline from '@mapbox/polyline';
-import '@/config/env';
 
 // =================================================================
 // 🛡️ INICIALIZAÇÃO BLINDADA VIA ARQUIVO JSON (À PROVA DE ERROS) 🛡️
@@ -21,12 +21,12 @@ if (!serviceAccountPath) {
 }
 
 console.log(`ℹ️ Usando arquivo de credenciais de: ${serviceAccountPath}`);
-const serviceAccount = require(serviceAccountPath);
+const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
 // Inicialização Secundária do Firebase (Motor Cartográfico/Mapas)
 const mapApp = admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: process.env.FIREBASE_MAP_STORAGE_BUCKET
+  storageBucket: env.FIREBASE_MAP_STORAGE_BUCKET
 }, 'mapGeoJsonApp');
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

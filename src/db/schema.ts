@@ -100,6 +100,7 @@ export const races = pgTable('races', {
   priority: text('priority'),
   // Métrica Cartográfica
   elevationGain: integer('elevation_gain'),
+  mapImageUrl: text('map_image_url'),
 });
 
 export const workoutSessions = pgTable('workout_sessions', {
@@ -156,6 +157,7 @@ export const plannedWorkouts = pgTable('planned_workouts', {
   details: jsonb('details'),
   isImported: boolean('is_imported').default(true),
   complianceStatus: text('compliance_status'), // 'VALIDATED' | 'COMPLETED_NOT_VALIDATED' | null
+  complianceFeedback: text('compliance_feedback'),
   // V12.2 - Orquestração de Macrociclo e Digital Twin
   mesocycleStage: integer('mesocycle_stage'), // 1=Base, 2=Carga, 3=Pico, 4=Deload/Taper
   macrocycleTarget: text('macrocycle_target'),

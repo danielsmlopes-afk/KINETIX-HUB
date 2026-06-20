@@ -19,10 +19,10 @@ export async function processPreRaceLogic(
   const rDate = new Date(race.date);
   
   // Zerando fuso da string para a diferença exata da janela de dias
-  rDate.setUTCHours(0, 0, 0, 0);
-  today.setUTCHours(0, 0, 0, 0);
+  const rDateUTC = Date.UTC(rDate.getUTCFullYear(), rDate.getUTCMonth(), rDate.getUTCDate());
+  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
 
-  const diffDays = Math.ceil((rDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round((rDateUTC - todayUTC) / (1000 * 60 * 60 * 24));
   let stage = '';
   let protocol = '';
   let wakeUpTime = '';

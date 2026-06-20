@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { workoutSessions } from '@/db/schema';
-import { eq, and, gte } from 'drizzle-orm';
+import { workoutSessions, plannedWorkouts } from '@/db/schema';
+import { eq, and, gte, sql, asc } from 'drizzle-orm';
 import { athleteRepository } from '@/repositories/athleteRepository';
 
 export const acwrService = {
@@ -19,16 +19,41 @@ export const acwrService = {
 
     const sessions = await db.select({
       date: workoutSessions.date,
-      load: workoutSessions.load
+      load: workoutSessions.load,
+      complianceStatus: plannedWorkouts.complianceStatus,
+      complianceFeedback: plannedWorkouts.complianceFeedback
     })
     .from(workoutSessions)
+    .leftJoin(
+      plannedWorkouts,
+      and(
+        eq(workoutSessions.athleteId, plannedWorkouts.athleteId),
+        eq(sql`DATE(${workoutSessions.date})`, sql`DATE(${plannedWorkouts.date})`)
+      )
+    )
     .where(and(eq(workoutSessions.athleteId, athlete.id), gte(workoutSessions.date, chronicDate)));
 
     let acuteLoad = 0;
     let chronicLoadTotal = 0;
 
     for (const session of sessions) {
-      const load = session.load || 0;
+      let load = session.load || 0;
+
+      // Fatoramento tático de fadiga com base no desvio de compliance
+      if (session.complianceStatus === 'COMPLETED_NOT_VALIDATED' || session.complianceStatus === 'PARTIAL') {
+        const feedback = (session.complianceFeedback || '').toLowerCase();
+        if (feedback.includes('forte demais') || feedback.includes('fadiga')) {
+          // Penalidade por excesso de intensidade: estresse cardiovascular/articular aumentado
+          load *= 1.3;
+        } else if (feedback.includes('lento demais')) {
+          // Compensação por intensidade reduzida: estresse inferior ao planejado
+          load *= 0.8;
+        } else {
+          // Desvio genérico (ex: volume)
+          load *= 1.1;
+        }
+      }
+
       chronicLoadTotal += load;
       
       if (session.date >= acuteDate) {
@@ -36,8 +61,21 @@ export const acwrService = {
       }
     }
 
+    // Descobre a data do primeiro treino registrado do atleta no sistema
+    const firstSession = await db.select({ date: workoutSessions.date })
+      .from(workoutSessions)
+      .where(eq(workoutSessions.athleteId, athlete.id))
+      .orderBy(asc(workoutSessions.date))
+      .limit(1);
+
+    let divisorWeeks = 4;
+    if (firstSession.length > 0) {
+      const daysActive = Math.ceil((now.getTime() - new Date(firstSession[0].date).getTime()) / (1000 * 60 * 60 * 24));
+      divisorWeeks = Math.max(1, Math.min(4, daysActive / 7));
+    }
+
     // Carga Crônica é a média semanal das últimas 4 semanas
-    const chronicLoad = chronicLoadTotal / 4;
+    const chronicLoad = chronicLoadTotal / divisorWeeks;
     const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
     const roundedAcwr = Math.round(acwr * 100) / 100;
 

@@ -406,19 +406,20 @@ export async function generateCareerReportPDF(): Promise<Buffer> {
     const prRecordsResult = await db.execute(sql`
       WITH ActivityPRs AS (
         SELECT 
-          id,
-          EXTRACT(YEAR FROM date) AS year,
-          distance,
-          "durationMinutes",
-          "map_polyline" AS mapPolyline,
-          weather,
+          ws.id,
+          EXTRACT(YEAR FROM ws.date) AS year,
+          ws.distance,
+          ws.duration_minutes AS "durationMinutes",
+          ws.map_polyline AS "mapPolyline",
+          ws.weather,
           CASE 
-            WHEN distance >= 9.5 AND distance <= 10.5 THEN '10km'
-            WHEN distance >= 20.5 AND distance <= 22.0 THEN '21km'
-            WHEN distance >= 41.5 THEN '42km'
+            WHEN ws.distance >= 9500 AND ws.distance <= 10500 THEN '10km'
+            WHEN ws.distance >= 20500 AND ws.distance <= 22000 THEN '21km'
+            WHEN ws.distance >= 41500 THEN '42km'
           END AS distance_target
-        FROM workout_sessions
-        WHERE "activityType" = 'RUN' AND "durationMinutes" IS NOT NULL
+        FROM workout_sessions ws
+        INNER JOIN planned_workouts pw ON ws.athlete_id = pw.athlete_id AND DATE(ws.date) = DATE(pw.date)
+        WHERE pw.activity_type = 'RUN' AND ws.duration_minutes IS NOT NULL
       ), 
       RankedPRs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY year, distance_target ORDER BY "durationMinutes" ASC) as rank

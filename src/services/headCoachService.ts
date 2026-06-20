@@ -31,8 +31,8 @@ export async function askHeadCoach(prompt: string, contextData?: Record<string, 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('❌ Erro na API do Gemini:', errorData);
+      const errorMsg = await extractGeminiError(response);
+      console.error(`❌ ${errorMsg}`);
       throw new Error('Falha na comunicação com o Motor Cognitivo da IA.');
     }
 
@@ -88,11 +88,16 @@ Você DEVE retornar EXATAMENTE um JSON válido com a seguinte estrutura:
     });
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error('Falha na comunicação com a IA para recálculo.');
+    if (!response.ok) {
+      const errorMsg = await extractGeminiError(response);
+      console.error(`❌ ${errorMsg}`);
+      throw new Error('Falha na comunicação com a IA para recálculo.');
+    }
 
     const data = await response.json();
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    return JSON.parse(textResponse) as CoachRecalculationResponse;
+    const cleanedJson = cleanJsonResponse(textResponse);
+    return JSON.parse(cleanedJson) as CoachRecalculationResponse;
   } catch (error) {
     console.error('⚠️ [CIRCUIT BREAKER] Falha no recálculo da IA:', error);
     return {
@@ -140,7 +145,7 @@ Você DEVE retornar EXATAMENTE um JSON array válido com os treinos. Sempre forn
 [META DE RITMO (PACE)]: ${request.targetPaceInstruction}
 [COMPOSIÇÃO CORPORAL]: ${request.bioimpedance ? JSON.stringify(request.bioimpedance) : 'Não informada'}
 [TREINOS EXISTENTES]: ${request.existingWorkouts ? JSON.stringify(request.existingWorkouts) : 'Nenhum'}
-
+ 
 Regras:
 1. Gere a planilha de treinos até o dia da prova.
 2. Siga as orientações em [META DE RITMO (PACE)] para balizar as zonas de esforço.
@@ -163,13 +168,49 @@ Regras:
     });
     clearTimeout(timeoutId);
 
-    if (!response.ok) throw new Error('Falha na comunicação com a IA para macrociclo.');
+    if (!response.ok) {
+      const errorMsg = await extractGeminiError(response);
+      console.error(`❌ ${errorMsg}`);
+      throw new Error('Falha na comunicação com a IA para macrociclo.');
+    }
 
     const data = await response.json();
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-    return JSON.parse(textResponse) as MacrocycleWorkout[];
+    const cleanedJson = cleanJsonResponse(textResponse);
+    return JSON.parse(cleanedJson) as MacrocycleWorkout[];
   } catch (error) {
     console.error('⚠️ [CIRCUIT BREAKER] Falha ao gerar macrociclo:', error);
     return []; // Retorna macrociclo vazio e evita que a requisição inteira crashe
   }
+}
+
+/**
+ * Utilitário: Limpa a resposta de texto do Gemini, removendo blocos de código Markdown.
+ */
+export function cleanJsonResponse(rawText: string): string {
+  let cleaned = rawText.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '');
+  }
+  return cleaned.trim();
+}
+
+/**
+ * Utilitário: Extrai mensagens de erro detalhadas da API do Gemini.
+ */
+export async function extractGeminiError(response: Response): Promise<string> {
+  const status = response.status;
+  try {
+    const clone = response.clone();
+    const json = await clone.json();
+    if (json.error?.message) {
+      return `Gemini API Error (HTTP ${status}): ${json.error.message}`;
+    }
+  } catch (_) {}
+  try {
+    const clone = response.clone();
+    const text = await clone.text();
+    return `Gemini API Error (HTTP ${status}): ${text.substring(0, 200)}`;
+  } catch (_) {}
+  return `Gemini API Error (HTTP ${status})`;
 }

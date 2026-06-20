@@ -103,7 +103,6 @@ Retorne EXATAMENTE um JSON válido com a seguinte estrutura:
     await db.update(plannedWorkouts)
       .set({ 
         complianceStatus,
-        // @ts-ignore - Salva a narrativa de auditoria, se suportada
         complianceFeedback: feedback 
       })
       .where(eq(plannedWorkouts.id, plannedWorkoutId));

@@ -123,8 +123,9 @@ Tarefa 2 - Nutrição da Véspera: Jantar até às 19h.`;
       let protocolsExecuted = 0;
       for (const race of upcomingRaces) {
         const rDate = new Date(race.date);
-        rDate.setHours(0, 0, 0, 0);
-        const diffDays = Math.ceil((rDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const rDateUTC = Date.UTC(rDate.getUTCFullYear(), rDate.getUTCMonth(), rDate.getUTCDate());
+        const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+        const diffDays = Math.round((rDateUTC - todayUTC) / (1000 * 60 * 60 * 24));
 
         let message = '';
         let mapBuffer: Buffer | null = null;

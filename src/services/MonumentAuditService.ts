@@ -62,6 +62,14 @@ export class MonumentAuditService {
           );
       }
 
+      let temperature: number | null = null;
+      if (race.weather) {
+        const match = race.weather.match(/(-?\d+)\s*°C/i);
+        if (match) {
+          temperature = parseInt(match[1], 10);
+        }
+      }
+
       const inserted = await db.insert(monumentRecords).values({
         athleteId: athlete.id,
         year,
@@ -71,7 +79,11 @@ export class MonumentAuditService {
         officialTime,
         pace,
         weather: race.weather || '--',
+        temperature,
+        locationCity: race.startLocation || 'Desconhecida',
+        date: race.date,
         polyline: race.polyline || null,
+        mapImageUrl: race.mapImageUrl || null,
         isAllTimePr,
         isYearPr
       }).returning();
