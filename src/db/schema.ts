@@ -162,6 +162,8 @@ export const plannedWorkouts = pgTable('planned_workouts', {
   mesocycleStage: integer('mesocycle_stage'), // 1=Base, 2=Carga, 3=Pico, 4=Deload/Taper
   macrocycleTarget: text('macrocycle_target'),
   longRunPerformanceLog: jsonb('long_run_performance_log'),
+  // V12.3 - Fase do macrociclo (ex: 'Fase 1: Base', 'Fase 3: Ápice', 'Fase 4: Taper')
+  phase: text('phase'),
 });
 
 export const cronLogs = pgTable('cron_logs', {

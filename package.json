@@ -16,6 +16,7 @@
     "db:setup": "npm run db:reset && npm run db:push && npm run db:seed && npm run db:migrate-tokens",
     "db:import-races": "tsx src/services/importPastRaces.ts",
     "seed:workouts": "tsx src/scripts/seedWorkouts.ts",
+    "upsert:plan": "tsx src/scripts/upsertPlanFromCsv.ts",
     "db:studio": "drizzle-kit studio",
     "sync:maps": "tsx src/scripts/syncHistoricalMaps.ts"
   },
