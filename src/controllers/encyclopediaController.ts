@@ -2,11 +2,13 @@ import { Context } from 'hono';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { EncyclopediaService } from '../services/encyclopediaService';
+import { athleteRepository } from '../repositories/athleteRepository';
 
 export const EncyclopediaController = {
   async getEncyclopedia(c: Context) {
     try {
-      const athleteId = c.get('athleteId') || c.req.header('athleteId');
+      const user = c.get('user');
+      const athleteId = user?.id ?? user?.uid ?? c.get('athleteId') ?? c.req.header('athleteId') ?? (await athleteRepository.getPrimaryAthlete())?.id;
 
       // 1. Volume anual total de TODAS as atividades do ano
       // Conversão de metros para KM e segundos para Horas (1 casa decimal)
@@ -32,9 +34,11 @@ export const EncyclopediaController = {
           location_city,
           temperature,
           weather,
+          polyline,
           map_image_url,
           is_year_pr AS "isYearPr",
-          is_all_time_pr AS "isAllTimePr"
+          is_all_time_pr AS "isAllTimePr",
+          activity_type AS "activityType"
         FROM monument_records
         WHERE athlete_id = ${athleteId}
         ORDER BY date DESC
@@ -61,6 +65,11 @@ export const EncyclopediaController = {
           encyclopediaData[year] = { volumeCorridas: null, tempoRuas: null, provas: [], epicRides: [] };
         }
 
+        let mapUrl = row.map_image_url ?? null;
+        if (!mapUrl && row.polyline) {
+          mapUrl = `/api/hall-of-fame/${row.id}/map`;
+        }
+
         encyclopediaData[year].provas.push({
           id: row.id ?? null,
           eventName: row.eventName ?? null,
@@ -71,9 +80,10 @@ export const EncyclopediaController = {
           location_city: row.location_city ?? null,
           temperature: row.temperature !== null ? Number(row.temperature) : null,
           weather: row.weather ?? null,
-          map_image_url: row.map_image_url ?? null,
+          map_image_url: mapUrl,
           isYearPr: row.isYearPr ?? null,
           isAllTimePr: row.isAllTimePr ?? null,
+          activityType: row.activityType ?? 'Run',
         });
       }
 

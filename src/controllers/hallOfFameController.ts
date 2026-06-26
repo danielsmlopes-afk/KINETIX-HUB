@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
 import { desc, eq, and, asc } from 'drizzle-orm';
 import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
+import { EncyclopediaService } from '@/services/encyclopediaService';
 
 export const hallOfFameController = {
   async getHallOfFame(c: Context) {
@@ -36,7 +37,22 @@ export const hallOfFameController = {
       const body = await c.req.json();
       const user = c.get('user');
 
-      const { year, eventName, distance, raceCategory, officialTime, pace, weather, polyline, isAllTimePr } = body;
+      const { 
+        year, 
+        eventName, 
+        distance, 
+        raceCategory, 
+        officialTime, 
+        pace, 
+        weather, 
+        polyline, 
+        isAllTimePr,
+        isYearPr,
+        date,
+        locationCity,
+        temperature,
+        activityType
+      } = body;
 
       if (!year || !eventName || !distance || !officialTime || !pace) {
         return c.json({ error: 'Parâmetros obrigatórios ausentes.' }, 400);
@@ -60,7 +76,15 @@ export const hallOfFameController = {
         weather: weather || '--',
         polyline: polyline || null,
         isAllTimePr: isAllTimePr || false,
+        isYearPr: isYearPr || false,
+        date: date ? new Date(date) : null,
+        locationCity: locationCity || null,
+        temperature: temperature !== undefined && temperature !== null ? Number(temperature) : null,
+        activityType: activityType || 'Run',
       }).returning();
+
+      // Forçar invalidação do cache da enciclopédia para atualização instantânea
+      await EncyclopediaService.triggerCacheUpdate();
 
       return c.json({ data: inserted[0], message: 'Prova épica registrada com sucesso!' }, 201);
     } catch (error) {

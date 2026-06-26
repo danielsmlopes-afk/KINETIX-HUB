@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { db } from '@/db';
 import { plannedWorkouts, races, bioimpedanceLogs } from '@/db/schema';
 import { eq, and, gte, lte, desc, between } from 'drizzle-orm';
-import { askHeadCoach, askHeadCoachForMacrocycle } from '@/services/headCoachService';
+import { askHeadCoach, askHeadCoachForMacrocycle, askHeadCoachForRecalculation } from '@/services/headCoachService';
 import { athleteRepository } from '@/repositories/athleteRepository';
 
 export const headCoachController = {
@@ -101,6 +101,90 @@ export const headCoachController = {
     } catch (error) {
       console.error('❌ Erro no Head Coach ao gerar macrociclo:', error);
       return c.json({ error: "Erro interno", code: "COACH_ERR" }, 500);
+    }
+  },
+
+  async recalculateRoute(c: Context) {
+    try {
+      const athlete = await athleteRepository.getPrimaryAthlete();
+      if (!athlete) {
+        return c.json({ error: "Atleta principal não encontrado.", code: "ATHLETE_NOT_FOUND" }, 404);
+      }
+
+      const body = await c.req.json().catch(() => ({}));
+      const { prompt } = body;
+
+      if (!prompt) {
+        return c.json({ error: "Você precisa enviar um 'prompt' descrevendo o ocorrido.", code: "MISSING_PARAM" }, 400);
+      }
+
+      // 1. Obter treinos planejados nos últimos 7 dias e próximos 14 dias
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const today = new Date(`${todayStr}T00:00:00Z`);
+      
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
+      
+      const fourteenDaysAhead = new Date(today);
+      fourteenDaysAhead.setUTCDate(fourteenDaysAhead.getUTCDate() + 14);
+
+      const workouts = await db.select().from(plannedWorkouts).where(
+        and(
+          eq(plannedWorkouts.athleteId, athlete.id),
+          gte(plannedWorkouts.date, sevenDaysAgo),
+          lte(plannedWorkouts.date, fourteenDaysAhead)
+        )
+      );
+
+      const recentWorkouts = workouts.filter(w => new Date(w.date) < today);
+      const upcomingWorkouts = workouts.filter(w => new Date(w.date) >= today);
+
+      const contextData = {
+        athleteName: athlete.name,
+        today: todayStr,
+        treinosRecentes: recentWorkouts.map(w => ({
+          id: w.id,
+          date: w.date.toISOString().split('T')[0],
+          type: w.activityType,
+          title: w.title,
+          status: w.complianceStatus || 'PENDING',
+          feedback: w.complianceFeedback || ''
+        })),
+        proximosTreinos: upcomingWorkouts.map(w => ({
+          id: w.id,
+          date: w.date.toISOString().split('T')[0],
+          type: w.activityType,
+          title: w.title
+        }))
+      };
+
+      // 2. Chamar a IA para efetuar o recálculo
+      const aiResponse = await askHeadCoachForRecalculation(prompt, contextData);
+
+      // 3. Aplicar as ações recomendadas pela IA no banco de dados
+      const appliedUpdates = [];
+      if (aiResponse.updates && Array.isArray(aiResponse.updates)) {
+        for (const update of aiResponse.updates) {
+          if (update.action === 'CANCEL') {
+            await db.delete(plannedWorkouts).where(eq(plannedWorkouts.id, update.id));
+            appliedUpdates.push({ id: update.id, action: 'CANCEL', notes: update.notes });
+          } else if (update.action === 'RESCHEDULE' && update.newDate) {
+            await db.update(plannedWorkouts).set({ date: new Date(update.newDate) }).where(eq(plannedWorkouts.id, update.id));
+            appliedUpdates.push({ id: update.id, action: 'RESCHEDULE', newDate: update.newDate, notes: update.notes });
+          }
+        }
+      }
+
+      return c.json({
+        data: {
+          advice: aiResponse.advice,
+          updates: appliedUpdates
+        }
+      });
+    } catch (error) {
+      console.error('❌ Erro no recalculateRoute do Head Coach:', error);
+      const message = error instanceof Error ? error.message : "Erro interno do Head Coach.";
+      return c.json({ error: message, code: "COACH_ERR" }, 500);
     }
   }
 };

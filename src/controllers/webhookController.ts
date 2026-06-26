@@ -10,6 +10,8 @@ import { webhookService } from '@/services/webhookService';
 import { db } from '@/db';
 import { healthLogs } from '@/db/schema';
 import { athleteRepository } from '@/repositories/athleteRepository';
+import { and, eq, sql } from 'drizzle-orm';
+import { redisClient } from '@/config/redis';
 
 const isAuth = (c: Context) => c.req.header('x-cron-secret') === env.CRON_SECRET;
 const authError = (c: Context) => c.json({ error: 'Unauthorized', code: 'AUTH_FAILED' }, 401);
@@ -184,14 +186,49 @@ export const webhookController = {
       
       const athlete = await athleteRepository.getPrimaryAthlete();
       if (athlete) {
-        await db.insert(healthLogs).values({
+        const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+        
+        // Evita duplicidade diária no banco buscando se já existe registro de hoje
+        const existingLogs = await db.select()
+          .from(healthLogs)
+          .where(and(
+            eq(healthLogs.athleteId, athlete.id),
+            sql`DATE(${healthLogs.date}) = ${todayStr}`
+          ))
+          .limit(1);
+
+        const payload = {
           athleteId: athlete.id,
-          date: new Date(),
-          steps: body.steps || 0,
-          sleepHours: body.sleepHours || 0,
-          hrv: body.hrv || 0,
-          restingHeartRate: body.restingHeartRate || 0,
-        });
+          steps: body.steps !== undefined && body.steps !== null ? Number(body.steps) : 0,
+          sleepHours: body.sleepHours !== undefined && body.sleepHours !== null ? Number(body.sleepHours) : null,
+          hrv: body.hrv !== undefined && body.hrv !== null ? Number(body.hrv) : null,
+          restingHeartRate: body.restingHeartRate !== undefined && body.restingHeartRate !== null ? Number(body.restingHeartRate) : null,
+        };
+
+        if (existingLogs.length > 0) {
+          // Atualiza o registro existente para a data de hoje
+          await db.update(healthLogs)
+            .set({
+              ...payload,
+              date: new Date(), // Atualiza o timestamp do último sync
+            })
+            .where(eq(healthLogs.id, existingLogs[0].id));
+          console.log(`✅ [Health Sync] Registro atualizado (UPDATE) para o atleta: ${athlete.id}`);
+        } else {
+          // Insere um novo registro diário
+          await db.insert(healthLogs).values({
+            ...payload,
+            date: new Date(),
+          });
+          console.log(`✅ [Health Sync] Novo registro criado (INSERT) para o atleta: ${athlete.id}`);
+        }
+
+        // Invalida o cache do perfil do painel no Redis para refletir instantaneamente no app
+        if (redisClient) {
+          const cacheKey = `dashboard:profile:${athlete.id}`;
+          await redisClient.del(cacheKey);
+          console.log(`🧹 [Health Sync] Cache do Redis limpo: ${cacheKey}`);
+        }
       }
       return c.json({ data: { message: 'Telemetria biológica recebida com sucesso pelo Head Coach IA.' } });
     } catch (error: any) {

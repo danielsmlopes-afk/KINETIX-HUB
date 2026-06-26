@@ -7,7 +7,7 @@ export const workoutController = {
   async validateManual(c: Context) {
     try {
       const body = await c.req.json();
-      const { workoutId, modality, mapPolyline, distance } = body;
+      const { workoutId, modality, mapPolyline, distance, durationMinutes, averageHeartRate, complianceFeedback } = body;
       let location = body.location ? String(body.location) : '';
       const lat = body.lat ? Number(body.lat) : undefined;
       const lng = body.lng ? Number(body.lng) : undefined;
@@ -30,7 +30,16 @@ export const workoutController = {
       }
       const weatherStr = await getTodayWeather(location);
 
-      await workoutService.validateManualWorkout(workoutId, modality, mapPolyline, distance, weatherStr);
+      await workoutService.validateManualWorkout(
+        workoutId,
+        modality,
+        mapPolyline,
+        distance,
+        weatherStr,
+        durationMinutes ? Number(durationMinutes) : undefined,
+        averageHeartRate ? Number(averageHeartRate) : undefined,
+        complianceFeedback ? String(complianceFeedback) : undefined
+      );
       return c.json({ data: { success: true, message: `Checklist manual validado (${modality})` } });
     } catch (error: unknown) {
       return c.json({ error: (error as Error).message }, 500);
