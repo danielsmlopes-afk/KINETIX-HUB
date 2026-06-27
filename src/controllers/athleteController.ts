@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { athletes, bioimpedanceLogs, races, plannedWorkouts, healthLogs } from '@/db/schema';
 import { eq, desc, gte, lt, and, asc } from 'drizzle-orm';
 import { getTodayWeather, getTomorrowWeather } from '@/services/weatherService';
+import { acwrService } from '@/services/acwrService';
 import { redisClient } from '@/config/redis';
 
 export const athleteController = {
@@ -141,10 +142,14 @@ export const athleteController = {
         };
       });
 
-      // Busca do clima atualizado (Hoje e Amanhã) rodando em paralelo para não travar a API
-      const [todayWeather, tomorrowWeather] = await Promise.all([
+      // Busca do clima atualizado e fadiga semanal rodando em paralelo para não travar a API
+      const [todayWeather, tomorrowWeather, weeklyFatigue] = await Promise.all([
         getTodayWeather('São Paulo'),
-        getTomorrowWeather('São Paulo')
+        getTomorrowWeather('São Paulo'),
+        acwrService.calculateWeeklyFatigue().catch(err => {
+          console.error('⚠️ Erro ao calcular ACWR no perfil:', err);
+          return null;
+        })
       ]);
 
       // Empacota tudo para o Payload consolidado do Dashboard Mobile
@@ -158,7 +163,8 @@ export const athleteController = {
         pastRaces,
         upcomingWorkouts,
         todayWeather,
-        tomorrowWeather
+        tomorrowWeather,
+        weeklyFatigue
       };
 
       // Salva no Redis com TTL de 5 minutos (300 segundos)
