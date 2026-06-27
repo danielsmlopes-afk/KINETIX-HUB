@@ -83,9 +83,9 @@ export const strengthController = {
               .limit(5)
           ]);
 
-          maxWeight = maxResult[0]?.maxWeight ?? 0;
+          maxWeight = maxResult[0]?.maxWeight ? Number(maxResult[0].maxWeight) : 0;
           // Inverte o array para que o gráfico fique em ordem cronológica (do mais antigo para o mais novo)
-          history = historyResult.map(r => r.weightUsed ?? 0).reverse();
+          history = historyResult.map(r => r.weightUsed ? Number(r.weightUsed) : 0).reverse();
           lastWeight = history.length > 0 ? history[history.length - 1] : 0;
         }
 
