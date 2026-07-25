@@ -2,7 +2,6 @@
 import { Hono } from 'hono';
 import { athleteController } from '@/controllers/athleteController';
 import { telegramController } from '@/controllers/telegramController';
-import { reportRoutes } from '@/routes/reportRoutes';
 import { stravaRoutes } from '@/routes/stravaRoutes';
 import { strengthRoutes } from '@/routes/strengthRoutes';
 import racesRouter from '@/routes/races';
@@ -17,6 +16,7 @@ import { dossierRoutes } from '@/routes/dossierRoutes';
 import { workoutRoutes } from '@/routes/workoutRoutes';
 import hallOfFameRoutes from '@/routes/hallOfFameRoutes';
 import { encyclopediaRoutes } from '@/routes/encyclopediaRoutes';
+import { nutritionRoutes } from '@/routes/nutritionRoutes';
 
 export const apiRoutes = new Hono();
 
@@ -33,8 +33,7 @@ apiRoutes.route('/debug', debugRoutes);
 // ============================================================================
 // 2. MÓDULO DE DOSSIÊS (Autenticação Híbrida: Header ou Query ?token=)
 // ============================================================================
-// Removido do privateAppRoutes para não ser bloqueado pelo middleware estrito.
-apiRoutes.route('/reports', reportRoutes);
+// As antigas rotas /reports foram removidas (Limpeza de PDFs).
 
 // ============================================================================
 // 3. MÓDULO CORE - APP MOBILE (Proteção Estrita via Header Bearer Token)
@@ -57,6 +56,7 @@ privateAppRoutes.route('/dossiers', dossierRoutes);
 privateAppRoutes.route('/workouts', workoutRoutes);
 privateAppRoutes.route('/hall-of-fame', hallOfFameRoutes);
 privateAppRoutes.route('/encyclopedia', encyclopediaRoutes);
+privateAppRoutes.route('/nutrition', nutritionRoutes);
 
 // Monta o grupo protegido na API depois das rotas livres
 apiRoutes.route('/', privateAppRoutes);
