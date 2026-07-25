@@ -9,6 +9,11 @@ let localAthleteId: string | null = null;
 let localCacheExpiration = 0;
 
 export const firebaseAuthMiddleware = async (c: Context, next: Next) => {
+  // Exceção para imagens de mapa estático (carregadas via <img> ou Image.network sem cabeçalho Auth)
+  if (c.req.path.endsWith('/map')) {
+    return await next();
+  }
+
   // DX: Permite bypass de autenticação em ambiente local (desenvolvimento) para facilitar testes
   if (env.BYPASS_AUTH_LOCAL === 'true') {
     let athleteId = localAthleteId;
