@@ -167,6 +167,20 @@ export const stravaController = {
       if (paceMatch) targetPaceStr = paceMatch[1];
     }
 
+    // 🚨 FILTRO INTELIGENTE: Blindagem contra Sequestro de Validação 🚨
+    if (expectedType === 'RUN') {
+      // Regra 1: Caminhadas são barradas de validar treinos de corrida moderados/longos
+      if (['Walk', 'Hike'].includes(currentType) && targetDistanceKm >= 5) {
+        console.log(`[Strava] Caminhada detectada (${distanceKm}km). Ignorando validação da corrida principal (${targetDistanceKm}km).`);
+        return;
+      }
+      // Regra 2: Corridas muito curtas (<3.5km) não validam metas longas (>=5km)
+      if (distanceKm <= 3.5 && targetDistanceKm >= 5) {
+        console.log(`[Strava] Aquecimento/Soltura detectado (${distanceKm}km). Ignorando validação do treino principal (${targetDistanceKm}km).`);
+        return;
+      }
+    }
+
     let auditResult = { complianceStatus: 'COMPLETED_NOT_VALIDATED', feedback: 'Auditoria não realizada.' };
     try {
       // Delegação para o novo Protocolo de Esteira Calibrada (V2)
