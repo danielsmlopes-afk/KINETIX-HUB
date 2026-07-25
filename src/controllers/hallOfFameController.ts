@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
 import { desc, eq, and, asc } from 'drizzle-orm';
-import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
+import { fetchMapStaticBuffer } from '@/services/mapStaticService';
 import { EncyclopediaService } from '@/services/encyclopediaService';
 
 export const hallOfFameController = {

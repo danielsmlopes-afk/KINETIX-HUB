@@ -10,7 +10,7 @@ import { plannedWorkouts, workoutSessions, races, monumentRecords, cronLogs, hea
 import { eq, and, sql, isNull, gte, lte, inArray, desc } from 'drizzle-orm';
 import { coachService } from '@/services/coachService';
 import { askHeadCoach, askHeadCoachForRecalculation } from '@/services/headCoachService';
-import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
+import { fetchMapStaticBuffer } from '@/services/mapStaticService';
 import { env } from '@/config/env';
 
 type WorkoutDetails = {

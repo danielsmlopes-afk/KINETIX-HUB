@@ -7,7 +7,7 @@ import { escapeMarkdown, briefingService } from './briefingService';
 import { telegramMessageService } from './telegramMessageService';
 import { env } from '@/config/env';
 import { generateRaceBriefingPdf } from './pdf/raceBriefingService';
-import { fetchMapStaticBuffer } from './pdfGeneratorService';
+import { fetchMapStaticBuffer } from './mapStaticService';
 
 type Race = InferSelectModel<typeof races>;
 type Athlete = InferSelectModel<typeof athletes>;

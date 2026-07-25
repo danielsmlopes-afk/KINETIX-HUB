@@ -130,7 +130,7 @@ export const telegramController = {
 
         // Comando: /mapa (Renderiza a Polyline e o Clima da Prova Alvo sob demanda)
         if (text === '/mapa') {
-          const { fetchMapStaticBuffer } = require('@/services/pdfGeneratorService');
+          const { fetchMapStaticBuffer } = require('@/services/mapStaticService');
           const { briefingService } = require('@/services/briefingService');
           
           const nextRaceList = await db.select().from(races)

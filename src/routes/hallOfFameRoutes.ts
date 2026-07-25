@@ -3,7 +3,7 @@ import { hallOfFameController } from '@/controllers/hallOfFameController';
 import { db } from '@/db';
 import { monumentRecords } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
+import { fetchMapStaticBuffer } from '@/services/mapStaticService';
 
 const hallOfFameRoutes = new Hono();
 

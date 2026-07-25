@@ -4,7 +4,7 @@ import { coachController } from '@/controllers/coachController';
 import { db } from '@/db';
 import { workoutSessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { fetchMapStaticBuffer } from '@/services/pdfGeneratorService';
+import { fetchMapStaticBuffer } from '@/services/mapStaticService';
 
 const workoutRoutes = new Hono();
 
