@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db } from '@/db';
 import { athletes, races, plannedWorkouts } from '@/db/schema';
 import { eq, gte, lte, and, asc } from 'drizzle-orm';
+import { gerarDecisaoNutricional } from '@/services/nutritionService';
 
 const nutritionRoutes = new Hono();
 
@@ -109,7 +110,6 @@ nutritionRoutes.get('/decision', async (c) => {
 
     // 4. Integrar com o Motor Nutricional Interno (substitui o antigo KinetiFuel Engine)
     console.log(`[Kinetix API] Processando decisão nutricional via nutritionService...`);
-    const { gerarDecisaoNutricional } = await import('@/services/nutritionService');
     const data = await gerarDecisaoNutricional(athlete.id, diasParaProva, zonaTreinoDia, rpe, tempoMinutos);
 
     const treinoAtivo = treinosHoje.length > 0 ? (treinosHoje.find(w => w.activityType === 'RUN') || treinosHoje[0]) : null;
