@@ -175,6 +175,37 @@ export async function gerarDecisaoNutricional(
     };
   }
 
+  // 7. Hidratação (Hydration Tracker)
+  const hidratacaoBase = pesoKg * 35; // 35ml por kg
+  const hidratacaoTreino = (tempoMinutos / 60) * 500; // 500ml por hora de treino
+  const hidratacaoTotalMl = hidratacaoBase + hidratacaoTreino;
+
+  // 8. Suplementação Estratégica
+  let suplementos = [];
+  if (cargaInternaTRIMP > 200 || zonaTreinoDia === 'Z4') {
+    suplementos.push("Whey Protein Isolado (Pós-treino)");
+    suplementos.push("Gel de Carboidrato (1 a cada 45min no treino)");
+    suplementos.push("Eletrólitos/Isotônico (Durante o treino)");
+  } else if (cargaInternaTRIMP > 100) {
+    suplementos.push("Whey Protein (Pós-treino)");
+    suplementos.push("Creatina (3-5g diárias)");
+  } else {
+    suplementos.push("Creatina (3-5g diárias)");
+    suplementos.push("Multivitamínico (Opcional)");
+  }
+
+  if (diasParaProva <= 7) {
+    suplementos.push("Suco de Beterraba (Nitrato) - Pré-treino/Prova");
+  }
+
+  // 9. Timeline de Refeições (Meal Timing)
+  let timeline = [
+    { periodo: "Pré-Treino (2h antes)", foco: "Carboidratos complexos, baixo índice de fibras/gorduras." },
+    { periodo: "Intra-Treino", foco: tempoMinutos > 60 ? "Reposição de carboidratos líquidos (gel/isotônico)." : "Água apenas." },
+    { periodo: "Pós-Treino (Até 1h após)", foco: "Proteína de rápida absorção + Carboidrato simples." },
+    { periodo: "Restante do Dia", foco: "Manutenção dos macros com comida de verdade, priorizando recuperação." }
+  ];
+
   return {
     cargaInternaTRIMP,
     faseIdentificada,
@@ -186,6 +217,13 @@ export async function gerarDecisaoNutricional(
       proteinasGramas
     },
     ingredientesRecomendados,
-    receitas
+    receitas,
+    hidratacao: {
+      baseMl: hidratacaoBase,
+      treinoMl: hidratacaoTreino,
+      totalRecomendadoMl: hidratacaoTotalMl
+    },
+    suplementos,
+    timeline
   };
 }
