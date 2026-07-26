@@ -64,7 +64,8 @@ export async function gerarDecisaoNutricional(
   diasParaProva: number,
   zonaTreinoDia: string,
   rpe: number,
-  tempoMinutos: number
+  tempoMinutos: number,
+  phase?: string | null
 ) {
   // 1. Cálculo de Carga Interna (TRIMP)
   const cargaInternaTRIMP = rpe * tempoMinutos;
@@ -106,20 +107,32 @@ export async function gerarDecisaoNutricional(
   let excludeIngredients = "";
   let fallbackKey = "";
 
-  if (diasParaProva <= 7) {
+  if (phase && phase.toUpperCase().includes('TAPERING')) {
+    faseIdentificada = `Macrociclo: ${phase} (Carb-loading e corte de fibras)`;
+    querySpoonacular = "chicken rice";
+    includeIngredients = "chicken,rice";
+    excludeIngredients = "beans,lentils,broccoli";
+    fallbackKey = "tapering";
+  } else if (phase && (phase.toUpperCase().includes('DESCARGA') || phase.toUpperCase().includes('RECUPERAÇÃO'))) {
+    faseIdentificada = `Macrociclo: ${phase} (Giro Livre e Recuperação)`;
+    querySpoonacular = "beef";
+    includeIngredients = "beef,lentils";
+    excludeIngredients = "";
+    fallbackKey = "leveRecuperacao";
+  } else if (diasParaProva <= 7) {
     faseIdentificada = "Modo Tapering (Carb-loading e corte de fibras)";
     querySpoonacular = "chicken rice";
     includeIngredients = "chicken,rice";
     excludeIngredients = "beans,lentils,broccoli";
     fallbackKey = "tapering";
-  } else if (zonaTreinoDia === 'Z3' || zonaTreinoDia === 'Z4') {
-    faseIdentificada = "Treino Intenso Z3/Z4 (Energia Sustentada)";
+  } else if (zonaTreinoDia === 'Z3' || zonaTreinoDia === 'Z4' || (phase && phase.toUpperCase().includes('PICO'))) {
+    faseIdentificada = phase ? `Macrociclo: ${phase} (Energia Sustentada)` : "Treino Intenso Z3/Z4 (Energia Sustentada)";
     querySpoonacular = "sweet potato";
     includeIngredients = "sweet potato,chicken";
     excludeIngredients = "";
     fallbackKey = "altaIntensidade";
   } else {
-    faseIdentificada = "Treino Leve/Recuperação Z1/Z2 (Giro Livre/Recuperação)";
+    faseIdentificada = phase ? `Macrociclo: ${phase} (Construção/Base)` : "Treino Leve/Recuperação Z1/Z2 (Giro Livre)";
     querySpoonacular = "beef";
     includeIngredients = "beef,lentils";
     excludeIngredients = "";

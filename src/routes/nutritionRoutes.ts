@@ -110,7 +110,8 @@ nutritionRoutes.get('/decision', async (c) => {
 
     // 4. Integrar com o Motor Nutricional Interno (substitui o antigo KinetiFuel Engine)
     console.log(`[Kinetix API] Processando decisão nutricional via nutritionService...`);
-    const data = await gerarDecisaoNutricional(athlete.id, diasParaProva, zonaTreinoDia, rpe, tempoMinutos);
+    const phase = treinosHoje.length > 0 ? (treinosHoje.find(w => w.activityType === 'RUN')?.phase || treinosHoje[0].phase) : null;
+    const data = await gerarDecisaoNutricional(athlete.id, diasParaProva, zonaTreinoDia, rpe, tempoMinutos, phase);
 
     const treinoAtivo = treinosHoje.length > 0 ? (treinosHoje.find(w => w.activityType === 'RUN') || treinosHoje[0]) : null;
     return c.json({
@@ -123,7 +124,8 @@ nutritionRoutes.get('/decision', async (c) => {
           treinoHoje: treinoAtivo ? treinoAtivo.title : 'Descanso total',
           tipoAtividade: treinoAtivo ? treinoAtivo.activityType : 'REST',
           tempoMinutos,
-          zonaTreinoDia
+          zonaTreinoDia,
+          faseMacrociclo: phase
         }
       }
     });
