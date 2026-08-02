@@ -90,7 +90,7 @@ export const athleteController = {
           )
         )
         .orderBy(asc(plannedWorkouts.date))
-        .limit(5);
+        .limit(90);
 
       // 5. Integração Tática com OpenWeatherMap para o Clima (Previsão de 5 dias)
       let weatherForecasts: any[] = [];
