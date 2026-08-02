@@ -160,11 +160,14 @@ export const stravaController = {
     let targetPaceStr = '';
 
     if (details && typeof details.corrida === 'string') {
-      const distMatch = details.corrida.match(/([\d.,]+)\s*km/i);
-      if (distMatch) targetDistanceKm = parseFloat(distMatch[1].replace(',', '.'));
-      
-      const paceMatch = details.corrida.match(/@\s*(\d{1,2}:\d{2})/);
-      if (paceMatch) targetPaceStr = paceMatch[1];
+      const parts = details.corrida.split('|').map(s => s.trim());
+      if (parts.length > 0) {
+        const distMatch = parts[0].match(/([\d.,]+)\s*km/i);
+        if (distMatch) targetDistanceKm = parseFloat(distMatch[1].replace(',', '.'));
+      }
+      if (parts.length > 1) {
+        targetPaceStr = parts[1];
+      }
     }
 
     // 🚨 FILTRO INTELIGENTE: Blindagem contra Sequestro de Validação 🚨

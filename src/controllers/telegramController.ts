@@ -25,7 +25,8 @@ export const telegramController = {
           'cmd_mapa': '/mapa',
           'cmd_auditoria': '/auditoria',
           'cmd_peso': '/peso',
-          'cmd_dor': '/dor'
+          'cmd_dor': '/dor',
+          'cmd_adiar': '/adiar'
         };
 
         if (cmdMap[callbackData]) {
@@ -111,6 +112,9 @@ export const telegramController = {
                 { text: '🔎 Auditar Strava', callback_data: 'cmd_auditoria' },
                 { text: '⚖️ Peso', callback_data: 'cmd_peso' },
                 { text: '🩹 Relatar Dor', callback_data: 'cmd_dor' }
+              ],
+              [
+                { text: '⏩ Adiar Treino', callback_data: 'cmd_adiar' }
               ]
             ]
           };
@@ -125,6 +129,46 @@ export const telegramController = {
         // Delegação para serviços existentes, comandos IA (OK) e injeção de JSON (Bioimpedância/Planilhas)
         if (text === '/briefing' || text === '/auditoria' || text === 'OK' || /[\{\[][\s\S]*[\}\]]/.test(text)) {
           await telegramMessageService.processIncomingMessage(chatId, text);
+          return c.text('OK', 200);
+        }
+
+        // Comando: /adiar (Postergamento manual de treino)
+        if (text === '/adiar' || text === '/postergartreino') {
+          const { webhookService } = require('@/services/webhookService');
+          
+          await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: "⚠️ Adiamento solicitado. Acionando Head Coach IA para recalcular a rota da semana..." })
+          });
+          
+          const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+          const pendingToday = await db.select().from(plannedWorkouts).where(
+            and(
+              eq(plannedWorkouts.athleteId, athlete.id), 
+              sql`DATE(${plannedWorkouts.date}) = ${todayStr}`
+            )
+          );
+          
+          let hasPending = false;
+          for (const w of pendingToday) {
+             if (w.complianceStatus !== 'VALIDATED' && w.complianceStatus !== 'COMPLETED_NOT_VALIDATED') {
+                 await db.update(plannedWorkouts).set({ complianceStatus: 'MISSED' }).where(eq(plannedWorkouts.id, w.id));
+                 hasPending = true;
+             }
+          }
+          
+          if (hasPending) {
+             // Dispara a rotina em background (desacoplada)
+             setTimeout(() => webhookService.processRouteRecalculation().catch(console.error), 0);
+          } else {
+             await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: "✅ Nenhum treino pendente encontrado para o dia de hoje. Bom descanso!" })
+             });
+          }
+          
           return c.text('OK', 200);
         }
 

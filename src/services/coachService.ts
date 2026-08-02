@@ -8,13 +8,22 @@ import { TREADMILL_AUDITOR_PROMPT } from '@/services/treadmillProtocol';
 /**
  * Utilitário: Converte pace formatado (ex: "07:10") para segundos totais.
  */
-function parsePaceToSeconds(paceStr: string): number {
-  if (!paceStr) return 0;
-  const match = paceStr.match(/(\d+):(\d{2})/);
-  if (match) {
-    return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+function parsePaceToSeconds(paceStr: string): { min: number, max: number } {
+  if (!paceStr) return { min: 0, max: 0 };
+  const matches = paceStr.match(/\d{1,2}:\d{2}/g);
+  if (!matches || matches.length === 0) return { min: 0, max: 0 };
+  
+  const parseSingle = (p: string) => {
+    const [m, s] = p.split(':').map(Number);
+    return m * 60 + s;
+  };
+  
+  const p1 = parseSingle(matches[0]);
+  if (matches.length > 1) {
+    const p2 = parseSingle(matches[1]);
+    return { min: Math.min(p1, p2), max: Math.max(p1, p2) };
   }
-  return 0;
+  return { min: p1, max: p1 };
 }
 
 /**
@@ -49,7 +58,7 @@ export const coachService = {
     const actualDistanceKm = activity.distance / 1000;
     const actualPaceSeconds = actualDistanceKm > 0 ? (activity.moving_time / actualDistanceKm) : 0;
 
-    const targetPaceSeconds = parsePaceToSeconds(targetPaceStr);
+    const targetPace = parsePaceToSeconds(targetPaceStr);
 
     if (isIndoor) {
       // CENÁRIO B: Esteira / Indoor (Delegação Total para o Head Coach IA via Protocolo Calibrado V2)
@@ -81,18 +90,26 @@ Retorne EXATAMENTE um JSON válido com a seguinte estrutura:
       if (actualDistanceKm < minDistanceAllowed) {
         complianceStatus = 'PARTIAL';
         feedback = `Distância abaixo da meta. Realizou ${actualDistanceKm.toFixed(2)}km de ${targetDistanceKm}km.`;
-      } else if (targetPaceSeconds > 0) {
-        const lowerBound = targetPaceSeconds - 10;
-        const upperBound = targetPaceSeconds + 10;
+      } else if (targetPace.min > 0) {
+        let minBound = targetPace.min;
+        let maxBound = targetPace.max;
+        
+        // Se for um pace único (sem range), aplica uma tolerância de +/- 5s
+        if (minBound === maxBound) {
+            minBound -= 5;
+            maxBound += 5;
+        }
 
-        if (actualPaceSeconds < lowerBound) {
+        if (actualPaceSeconds < minBound) {
           complianceStatus = 'PARTIAL';
-          feedback = "Ritmo forte demais. Risco de fadiga residual.";
-        } else if (actualPaceSeconds > upperBound) {
+          const pStr = `${Math.floor(actualPaceSeconds/60)}:${Math.floor(actualPaceSeconds%60).toString().padStart(2,'0')}`;
+          feedback = `Ritmo forte demais (${pStr}). Fora da janela estipulada (${targetPaceStr}). Risco de fadiga residual.`;
+        } else if (actualPaceSeconds > maxBound) {
           complianceStatus = 'PARTIAL';
-          feedback = "Ritmo lento demais.";
+          const pStr = `${Math.floor(actualPaceSeconds/60)}:${Math.floor(actualPaceSeconds%60).toString().padStart(2,'0')}`;
+          feedback = `Ritmo muito lento (${pStr}). Fora da janela estipulada (${targetPaceStr}).`;
         } else {
-          feedback = "Ritmo de prova validado com precisão militar.";
+          feedback = `Ritmo validado com precisão militar, cravado na janela de combate (${targetPaceStr}).`;
         }
       } else {
         feedback = "Distância validada com precisão militar. (Pace livre/não estipulado).";
